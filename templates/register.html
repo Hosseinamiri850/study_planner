@@ -14,7 +14,7 @@
         }
         
         body {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            background: #0f172a;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,6 +22,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             position: relative;
             overflow: hidden;
+            padding: 20px 0;
         }
         
         body::before {
@@ -31,7 +32,7 @@
             left: -50%;
             width: 200%;
             height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background: radial-gradient(circle, rgba(245, 87, 108, 0.1) 1px, transparent 1px);
             background-size: 50px 50px;
             animation: moveBackground 20s linear infinite;
         }
@@ -50,12 +51,13 @@
         }
         
         .register-card {
-            background: rgba(255, 255, 255, 0.95);
+            background: rgba(30, 41, 59, 0.95);
             border-radius: 30px;
             padding: 50px 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(10px);
             animation: slideUp 0.6s ease-out;
+            border: 1px solid rgba(245, 87, 108, 0.2);
         }
         
         @keyframes slideUp {
@@ -97,13 +99,13 @@
         }
         
         h2 {
-            color: #2d3748;
+            color: #f1f5f9;
             font-weight: 700;
             margin-bottom: 10px;
         }
         
         .subtitle {
-            color: #718096;
+            color: #94a3b8;
             font-size: 14px;
         }
         
@@ -114,33 +116,44 @@
         
         .form-group label {
             display: block;
-            color: #2d3748;
+            color: #cbd5e1;
             font-weight: 600;
             margin-bottom: 8px;
             font-size: 14px;
         }
         
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 15px 45px 15px 15px;
-            border: 2px solid #e2e8f0;
+            border: 2px solid rgba(148, 163, 184, 0.3);
             border-radius: 15px;
             font-size: 15px;
             transition: all 0.3s ease;
-            background: white;
+            background: rgba(15, 23, 42, 0.5);
+            color: #f1f5f9;
         }
         
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #f5576c;
-            box-shadow: 0 0 0 4px rgba(245, 87, 108, 0.1);
+            box-shadow: 0 0 0 4px rgba(245, 87, 108, 0.2);
+            background: rgba(15, 23, 42, 0.7);
+        }
+        
+        .form-group input::placeholder {
+            color: #64748b;
+        }
+        
+        .form-group select option {
+            background: #1e293b;
+            color: #f1f5f9;
         }
         
         .form-group i {
             position: absolute;
             left: 15px;
             top: 48px;
-            color: #cbd5e0;
+            color: #64748b;
             font-size: 18px;
         }
         
@@ -180,20 +193,20 @@
             left: 0;
             right: 0;
             height: 1px;
-            background: #e2e8f0;
+            background: rgba(148, 163, 184, 0.3);
         }
         
         .divider span {
-            background: white;
+            background: rgba(30, 41, 59, 0.95);
             padding: 0 15px;
-            color: #718096;
+            color: #94a3b8;
             font-size: 14px;
             position: relative;
         }
         
         .login-link {
             text-align: center;
-            color: #718096;
+            color: #94a3b8;
             font-size: 14px;
         }
         
@@ -228,13 +241,15 @@
         }
         
         .alert-danger {
-            background: #fee;
-            color: #c53030;
+            background: rgba(239, 68, 68, 0.2);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
         }
         
         .alert-success {
-            background: #efe;
-            color: #2f855a;
+            background: rgba(16, 185, 129, 0.2);
+            color: #6ee7b7;
+            border: 1px solid rgba(16, 185, 129, 0.3);
         }
     </style>
 </head>
