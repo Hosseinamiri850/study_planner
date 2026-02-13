@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پنل مدیریت - برنامه‌ریز مطالعه</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: rgba(30, 41, 59, 0.95);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.2);
+        }
+        
+        body.light-theme {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+        }
+        
+        body {
+            background: var(--bg-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-primary);
+            padding: 30px;
+            transition: all 0.3s ease;
+        }
+        
+        .admin-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .admin-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .admin-subtitle {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .theme-logout-btns {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .theme-toggle, .btn-logout {
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-logout {
+            background: rgba(0, 0, 0, 0.3);
+            color: white;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-logout:hover {
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+        }
+        
+        .stat-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            color: white;
+            font-size: 28px;
+        }
+        
+        .stat-value {
+            font-size: 36px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+        
+        .card-body {
+            padding: 25px;
+        }
+        
+        .card-body h5, .card-body h6 {
+            color: var(--text-primary) !important;
+        }
+        
+        .table {
+            color: var(--text-primary);
+        }
+        
+        .table thead {
+            background: var(--bg-primary);
+        }
+        
+        .table tbody tr {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .table tbody tr:hover {
+            background: var(--bg-primary);
+        }
+        
+        .badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+            border-radius: 8px;
+        }
+        
+        .form-control, .form-select {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+            border-radius: 10px;
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-secondary) !important;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: var(--bg-primary);
+            border-color: #667eea;
+            color: var(--text-primary) !important;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-select option {
+            background: var(--bg-secondary);
+        }
+        
+        .modal-content {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .modal-content .form-control {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+        }
+        
+        .modal-content .form-control::placeholder {
+            color: var(--text-secondary) !important;
+        }
+        
+        .modal-content .form-control:focus {
+            background: var(--bg-primary);
+            color: var(--text-primary) !important;
+            border-color: #667eea;
+        }
+        
+        .modal-content label {
+            color: var(--text-primary);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .modal-footer {
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-close {
+            filter: invert(1);
+        }
+        
+        body.light-theme .btn-close {
+            filter: invert(0);
+        }
+    </style>
+</head>
+<body class="{{ 'light-theme' if theme == 'light' else '' }}">
+    <div class="container-fluid">
+        <div class="admin-header">
+            <div>
+                <div class="admin-title">
+                    <i class="bi bi-shield-check"></i> پنل مدیریت
+                </div>
+                <div class="admin-subtitle">مدیریت کامل سیستم</div>
+            </div>
+            <div class="theme-logout-btns">
+                <button class="theme-toggle" onclick="toggleTheme()">
+                    <i class="bi bi-{{ 'sun' if theme == 'dark' else 'moon' }}"></i>
+                </button>
+                <a href="/logout" class="btn-logout">
+                    <i class="bi bi-box-arrow-left"></i> خروج
+                </a>
+            </div>
+        </div>
+        
+        <!-- آمار کلی -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon"><i class="bi bi-people"></i></div>
+                <div class="stat-value">{{ total_users }}</div>
+                <div class="stat-label">کل کاربران</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="bi bi-list-task"></i></div>
+                <div class="stat-value">{{ total_tasks_all }}</div>
+                <div class="stat-label">کل تسک‌ها</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
+                <div class="stat-value">{{ total_done_all }}</div>
+                <div class="stat-label">تسک‌های انجام شده</div>
+            </div>
+        </div>
+        
+        <!-- مدیریت کاربران -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="mb-4"><i class="bi bi-people-fill"></i> مدیریت کاربران</h5>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>نام کاربری</th>
+                                <th>نام کامل</th>
+                                <th>تسک‌ها</th>
+                                <th>انجام شده</th>
+                                <th>ساعت امروز</th>
+                                <th>ساعت هفته</th>
+                                <th>کل ساعات</th>
+                                <th>تاریخ عضویت</th>
+                                <th>عملیات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users_stats %}
+                            <tr>
+                                <td><strong>@{{ user.username }}</strong></td>
+                                <td>{{ user.fullname }}</td>
+                                <td>{{ user.total_tasks }}</td>
+                                <td>{{ user.done_tasks }}</td>
+                                <td><span class="badge bg-warning text-dark">{{ "%.1f"|format(user.today_hours) }}h</span></td>
+                                <td><span class="badge bg-info">{{ "%.1f"|format(user.week_hours) }}h</span></td>
+                                <td><span class="badge bg-success">{{ "%.1f"|format(user.total_hours) }}h</span></td>
+                                <td>{{ user.created_at }}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal{{ loop.index0 }}">
+                                        <i class="bi bi-key"></i>
+                                    </button>
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('حذف شود؟')">
+                                        <button name="delete_user" value="{{ user.username }}" class="btn btn-danger btn-sm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            
+                            <!-- Change Password Modal -->
+                            <div class="modal fade" id="changePasswordModal{{ loop.index0 }}">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">تغییر رمز عبور: {{ user.username }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="change_password" value="{{ user.username }}">
+                                                <div class="mb-3">
+                                                    <label class="form-label">رمز عبور جدید</label>
+                                                    <input type="text" name="new_password" class="form-control" required>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">لغو</button>
+                                                <button type="submit" class="btn btn-primary">تغییر رمز</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- مدیریت رشته‌ها و دروس -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-4"><i class="bi bi-bookmark-plus"></i> افزودن رشته جدید</h5>
+                        <form method="POST">
+                            <div class="mb-3">
+                                <input type="text" name="add_major" class="form-control" placeholder="نام رشته..." required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">افزودن رشته</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-4"><i class="bi bi-book-half"></i> افزودن درس</h5>
+                        <form method="POST">
+                            <div class="mb-3">
+                                <select name="major_for_course" class="form-select" required>
+                                    <option value="">انتخاب رشته...</option>
+                                    {% for major in majors.keys() %}
+                                    <option value="{{ major }}">{{ major }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <input type="text" name="new_course" class="form-control" placeholder="نام درس..." required>
+                            </div>
+                            <button type="submit" name="add_course" value="1" class="btn btn-success w-100">افزودن درس</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- لیست رشته‌ها و دروس -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="mb-4"><i class="bi bi-grid-3x3-gap"></i> مدیریت رشته‌ها و دروس</h5>
+                <div class="row">
+                    {% for major, major_data in majors.items() %}
+                    <div class="col-md-4 mb-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="mb-0">{{ major }}</h6>
+                                    {% if major != 'کامپیوتر' %}
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('رشته حذف شود؟')">
+                                        <button name="delete_major" value="{{ major }}" class="btn btn-danger btn-sm">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% for course in major_data.courses %}
+                                    <form method="POST" class="d-inline">
+                                        <input type="hidden" name="course_major" value="{{ major }}">
+                                        <button type="submit" name="delete_course" value="{{ course }}" class="btn btn-sm btn-outline-secondary" onclick="return confirm('حذف شود؟')">
+                                            {{ course }} <i class="bi bi-x"></i>
+                                        </button>
+                                    </form>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function toggleTheme() {
+            fetch('/toggle-theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.theme === 'light') {
+                    document.body.classList.add('light-theme');
+                } else {
+                    document.body.classList.remove('light-theme');
+                }
+                location.reload();
+            });
+        }
+
+        <!-- نمودارهای سیستم -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> نمودار هفتگی کل سیستم</h5>
+                        <div style="height: 250px;">
+                            <canvas id="systemWeekChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> نمودار ماهانه کل سیستم</h5>
+                        <div style="height: 250px;">
+                            <canvas id="systemMonthChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        function toggleTheme() {
+            fetch('/toggle-theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                location.reload();
+            });
+        }
+        
+        const isDark = document.body.classList.contains('light-theme') ? false : true;
+        const textColor = isDark ? '#f1f5f9' : '#1e293b';
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.2)' : '#e2e8f0';
+        
+        const weekChartCanvas = document.getElementById('systemWeekChart');
+        if (weekChartCanvas && !weekChartCanvas.chartInstance) {
+            const weekData = {{ system_week_hours | tojson }};
+            const weekLabels = Object.keys(weekData).reverse().map(d => d.substring(5));
+            const weekValues = Object.keys(weekData).reverse().map(k => weekData[k]);
+            
+            weekChartCanvas.chartInstance = new Chart(weekChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: weekLabels,
+                    datasets: [{
+                        label: 'ساعت کل',
+                        data: weekValues,
+                        backgroundColor: 'rgba(239, 68, 68, 0.8)',
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        
+        const monthChartCanvas = document.getElementById('systemMonthChart');
+        if (monthChartCanvas && !monthChartCanvas.chartInstance) {
+            const monthData = {{ system_month_hours | tojson }};
+            const monthLabels = Object.keys(monthData).reverse().map(d => d.substring(5));
+            const monthValues = Object.keys(monthData).reverse().map(k => monthData[k]);
+            
+            monthChartCanvas.chartInstance = new Chart(monthChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'ساعت کل',
+                        data: monthValues,
+                        borderColor: 'rgba(239, 68, 68, 1)',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { 
+                                color: textColor,
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -7,6 +7,24 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: rgba(30, 41, 59, 0.95);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.2);
+        }
+        
+        body.light-theme {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+        }
+        
         * {
             margin: 0;
             padding: 0;
@@ -14,28 +32,29 @@
         }
         
         body {
-            background: #f8fafc;
+            background: var(--bg-primary);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #1e293b;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
         }
         
-        /* Sidebar */
         .sidebar {
             position: fixed;
             top: 0;
             right: 0;
             height: 100vh;
             width: 280px;
-            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            background: var(--bg-secondary);
             padding: 30px 20px;
             z-index: 1000;
             box-shadow: -5px 0 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
         }
         
         .sidebar-header {
             text-align: center;
             padding-bottom: 30px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom: 1px solid var(--border-color);
             margin-bottom: 30px;
         }
         
@@ -54,14 +73,14 @@
         }
         
         .user-name {
-            color: white;
+            color: var(--text-primary);
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 5px;
         }
         
         .user-username {
-            color: #94a3b8;
+            color: var(--text-secondary);
             font-size: 14px;
         }
         
@@ -70,29 +89,45 @@
         }
         
         .stat-item {
-            background: rgba(255, 255, 255, 0.05);
+            background: var(--bg-primary);
             border-radius: 12px;
             padding: 15px;
             margin-bottom: 10px;
-            color: white;
         }
         
         .stat-label {
             font-size: 12px;
-            color: #94a3b8;
+            color: var(--text-secondary);
             margin-bottom: 5px;
         }
         
         .stat-value {
             font-size: 24px;
             font-weight: 700;
-            color: white;
+            color: var(--text-primary);
         }
         
         .stat-value small {
             font-size: 14px;
-            color: #cbd5e1;
+            color: var(--text-secondary);
             font-weight: normal;
+        }
+        
+        .theme-toggle {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--bg-card);
         }
         
         .btn-logout {
@@ -115,7 +150,6 @@
             color: #ef4444;
         }
         
-        /* Main Content */
         .main-content {
             margin-right: 280px;
             padding: 30px;
@@ -129,19 +163,18 @@
         .page-title {
             font-size: 32px;
             font-weight: 700;
-            color: #1e293b;
+            color: var(--text-primary);
             margin-bottom: 5px;
         }
         
         .page-subtitle {
-            color: #64748b;
+            color: var(--text-secondary);
             font-size: 16px;
         }
         
-        /* Cards */
         .card {
-            background: white;
-            border: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 20px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             margin-bottom: 25px;
@@ -152,10 +185,18 @@
             padding: 25px;
         }
         
-        /* Add Task Form */
+        .card-body h5, .card-body h6 {
+            color: var(--text-primary) !important;
+        }
+        
+        .card-body small {
+            color: var(--text-secondary) !important;
+        }
+        
         .add-task-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border: none;
         }
         
         .add-task-card h5 {
@@ -165,7 +206,8 @@
         }
         
         .add-task-card .form-control,
-        .add-task-card .form-select {
+        .add-task-card .form-select,
+        .add-task-card .form-textarea {
             background: rgba(255, 255, 255, 0.15);
             border: 1px solid rgba(255, 255, 255, 0.3);
             color: white;
@@ -173,12 +215,20 @@
             padding: 12px 15px;
         }
         
-        .add-task-card .form-control::placeholder {
+        .add-task-card .form-control::placeholder,
+        .add-task-card .form-textarea::placeholder {
             color: rgba(255, 255, 255, 0.7);
         }
         
+        .add-task-card .form-control,
+        .add-task-card .form-select,
+        .add-task-card .form-textarea {
+            color: white !important;
+        }
+        
         .add-task-card .form-control:focus,
-        .add-task-card .form-select:focus {
+        .add-task-card .form-select:focus,
+        .add-task-card .form-textarea:focus {
             background: rgba(255, 255, 255, 0.25);
             border-color: rgba(255, 255, 255, 0.5);
             color: white;
@@ -212,9 +262,8 @@
             box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
         }
         
-        /* Task List */
         .task-item {
-            background: #f8fafc;
+            background: var(--bg-primary);
             border-radius: 15px;
             padding: 20px;
             margin-bottom: 15px;
@@ -223,7 +272,7 @@
         }
         
         .task-item:hover {
-            background: #f1f5f9;
+            opacity: 0.9;
             transform: translateX(-5px);
         }
         
@@ -246,7 +295,7 @@
         .task-title {
             font-size: 16px;
             font-weight: 600;
-            color: #1e293b;
+            color: var(--text-primary);
             margin-bottom: 8px;
         }
         
@@ -254,12 +303,19 @@
             text-decoration: line-through;
         }
         
+        .task-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        
         .task-meta {
             display: flex;
             gap: 15px;
             align-items: center;
             font-size: 13px;
-            color: #64748b;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
         }
         
         .task-category {
@@ -320,7 +376,6 @@
             color: white;
         }
         
-        /* Users List */
         .users-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -329,10 +384,10 @@
         }
         
         .user-card {
-            background: white;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
             border-radius: 15px;
             padding: 20px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
             cursor: pointer;
             text-decoration: none;
@@ -348,6 +403,7 @@
         .user-card.current-user {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
+            border: none;
         }
         
         .user-card-avatar {
@@ -384,7 +440,8 @@
             display: flex;
             justify-content: space-between;
             padding-top: 15px;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            border-top: 1px solid;
+            border-top-color: var(--border-color);
         }
         
         .user-card.current-user .user-card-stats {
@@ -406,14 +463,15 @@
             margin-top: 3px;
         }
         
-        /* Modal */
         .modal-content {
+            background: var(--bg-card);
             border-radius: 20px;
-            border: none;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
         }
         
         .modal-header {
-            border-bottom: 1px solid #e2e8f0;
+            border-bottom: 1px solid var(--border-color);
             padding: 25px;
         }
         
@@ -421,16 +479,52 @@
             padding: 25px;
         }
         
+        .modal-body label {
+            color: var(--text-primary);
+        }
+        
+        .modal-body .form-control,
+        .modal-body .form-select,
+        .modal-body .form-textarea {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+        }
+        
+        .modal-body .form-control::placeholder,
+        .modal-body .form-textarea::placeholder {
+            color: var(--text-secondary) !important;
+        }
+        
+        .modal-body .form-control:focus,
+        .modal-body .form-select:focus,
+        .modal-body .form-textarea:focus {
+            background: var(--bg-primary);
+            border-color: #667eea;
+            color: var(--text-primary);
+        }
+        
+        .modal-body .form-select option {
+            background: var(--bg-secondary);
+        }
+        
         .modal-footer {
-            border-top: 1px solid #e2e8f0;
+            border-top: 1px solid var(--border-color);
             padding: 20px 25px;
         }
         
-        /* Empty State */
+        .btn-close {
+            filter: invert(1);
+        }
+        
+        body.light-theme .btn-close {
+            filter: invert(0);
+        }
+        
         .empty-state {
             text-align: center;
             padding: 60px 20px;
-            color: #94a3b8;
+            color: var(--text-secondary);
         }
         
         .empty-state i {
@@ -439,24 +533,42 @@
             opacity: 0.3;
         }
         
-        .empty-state p {
-            font-size: 16px;
-        }
-        
-        /* Progress Bar */
         .progress {
             height: 12px;
             border-radius: 10px;
-            background: #e2e8f0;
+            background: var(--bg-primary);
         }
         
         .progress-bar {
             border-radius: 10px;
             background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
         }
+        
+        .manage-section {
+            background: var(--bg-primary);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        
+        .manage-section h6 {
+            color: var(--text-primary);
+            margin-bottom: 15px;
+        }
+        
+        .manage-section .form-control,
+        .manage-section .form-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+        }
+        
+        .manage-section .form-control::placeholder {
+            color: var(--text-secondary) !important;
+        }
     </style>
 </head>
-<body>
+<body class="{{ 'light-theme' if theme == 'light' else '' }}">
     <!-- Sidebar -->
     <div class="sidebar">
         <div class="sidebar-header">
@@ -482,6 +594,11 @@
             </div>
         </div>
         
+        <button class="theme-toggle" onclick="toggleTheme()">
+            <i class="bi bi-{{ 'sun' if theme == 'dark' else 'moon' }}"></i> 
+            تم {{ 'روشن' if theme == 'dark' else 'تاریک' }}
+        </button>
+        
         <a href="/logout" class="btn-logout">
             <i class="bi bi-box-arrow-left"></i> خروج
         </a>
@@ -500,19 +617,16 @@
                 <h5><i class="bi bi-plus-circle"></i> تسک جدید اضافه کن</h5>
                 <form method="POST">
                     <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">عنوان تسک</label>
-                            <input type="text" name="new_task" class="form-control" placeholder="مثلاً: حل تمرین ساختمان داده" required>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">دسته‌بندی</label>
-                            <select name="category" class="form-select">
-                                {% for cat in categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
+                        <div class="col-md-4">
+                            <label class="form-label">درس</label>
+                            <select name="course" class="form-select" required>
+                                <option value="">انتخاب کنید...</option>
+                                {% for course in courses %}
+                                <option value="{{ course }}">{{ course }}</option>
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-2">
+                        <div class="col-md-3">
                             <label class="form-label">اولویت</label>
                             <select name="priority" class="form-select">
                                 <option value="high">🔴 مهم</option>
@@ -520,14 +634,19 @@
                                 <option value="low">🟢 کم</option>
                             </select>
                         </div>
-                        <div class="col-md-1">
+                        <div class="col-md-2">
                             <label class="form-label">ساعت</label>
-                            <input type="number" step="0.5" name="task_hours" class="form-control" placeholder="2" value="1">
+                            <input type="number" step="0.5" name="task_hours" class="form-control" placeholder="2" value="1" required>
                         </div>
-                        <div class="col-12">
-                            <button type="submit" class="btn btn-add-task">
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" name="new_task" value="1" class="btn btn-add-task w-100">
                                 <i class="bi bi-plus-lg"></i> افزودن تسک
                             </button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">توضیحات (اختیاری)</label>
+                            <textarea name="description" class="form-control form-textarea" rows="2" placeholder="توضیحات بیشتر..."></textarea>
                         </div>
                     </div>
                 </form>
@@ -554,8 +673,13 @@
                                         <div class="task-title {% if task.done %}done{% endif %}">
                                             {{ task.title }}
                                         </div>
+                                        {% if task.description %}
+                                        <div class="task-description">
+                                            {{ task.description }}
+                                        </div>
+                                        {% endif %}
                                         <div class="task-meta">
-                                            <span class="task-category">{{ task.category }}</span>
+                                            <span class="task-category">{{ task.title }}</span>
                                             <span class="task-hours">
                                                 <i class="bi bi-clock"></i> {{ task.hours }} ساعت
                                             </span>
@@ -594,14 +718,10 @@
                                             <div class="modal-body">
                                                 <input type="hidden" name="edit_idx" value="{{ loop.index0 }}">
                                                 <div class="mb-3">
-                                                    <label class="form-label">عنوان</label>
-                                                    <input type="text" name="edit_title" class="form-control" value="{{ task.title }}" required>
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label">دسته‌بندی</label>
-                                                    <select name="edit_category" class="form-select">
-                                                        {% for cat in categories %}
-                                                        <option value="{{ cat }}" {% if cat == task.category %}selected{% endif %}>{{ cat }}</option>
+                                                    <label class="form-label">درس</label>
+                                                    <select name="edit_course" class="form-select" required>
+                                                        {% for course in courses %}
+                                                        <option value="{{ course }}" {% if course == task.title %}selected{% endif %}>{{ course }}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </div>
@@ -615,7 +735,11 @@
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label">ساعت</label>
-                                                    <input type="number" step="0.5" name="edit_hours" class="form-control" value="{{ task.hours }}">
+                                                    <input type="number" step="0.5" name="edit_hours" class="form-control" value="{{ task.hours }}" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">توضیحات (اختیاری)</label>
+                                                    <textarea name="edit_description" class="form-control form-textarea" rows="3">{{ task.description }}</textarea>
                                                 </div>
                                             </div>
                                             <div class="modal-footer">
@@ -635,19 +759,95 @@
                         {% endif %}
                     </div>
                 </div>
+                
+                <!-- Manage Majors and Courses -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-gear"></i> مدیریت رشته و دروس</h5>
+                        
+                        <div class="manage-section">
+                            <h6>افزودن رشته جدید</h6>
+                            <form method="POST" class="row g-2">
+                                <div class="col-9">
+                                    <input type="text" name="new_major" class="form-control" placeholder="نام رشته جدید..." required>
+                                </div>
+                                <div class="col-3">
+                                    <button type="submit" class="btn btn-primary w-100">افزودن</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="manage-section">
+                            <h6>افزودن درس به رشته</h6>
+                            <form method="POST" class="row g-2">
+                                <div class="col-5">
+                                    <select name="major_for_course" class="form-select" required>
+                                        {% for major, major_data in majors.items() %}
+                                        <option value="{{ major }}" {% if major == user_major %}selected{% endif %}>{{ major }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-5">
+                                    <input type="text" name="new_course" class="form-control" placeholder="نام درس..." required>
+                                </div>
+                                <div class="col-2">
+                                    <button type="submit" name="add_course" value="1" class="btn btn-success w-100">افزودن</button>
+                                </div>
+                            </form>
+                        </div>
+                        
+                        <div class="manage-section">
+                            <h6>دروس رشته {{ user_major }}</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for course in courses %}
+                                <form method="POST" class="d-inline">
+                                    <input type="hidden" name="delete_major" value="{{ user_major }}">
+                                    <button type="submit" name="delete_course" value="{{ course }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف شود؟')">
+                                        {{ course }} <i class="bi bi-x"></i>
+                                    </button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             
             <!-- Stats Column -->
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> نمودار هفتگی</h5>
+                        <div style="height: 200px;">
+                            <canvas id="weekChart"></canvas>
+                        </div>
+                        <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
+                            مجموع: {{ "%.1f"|format(total_week_hours) }} ساعت
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> نمودار ماهانه</h5>
+                        <div style="height: 200px;">
+                            <canvas id="monthChart"></canvas>
+                        </div>
+                        <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
+                            مجموع: {{ "%.1f"|format(total_month_hours) }} ساعت
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
                         <h5 class="mb-3"><i class="bi bi-pie-chart"></i> آمار دروس</h5>
-                        {% for cat, stats in category_stats.items() %}
+                        {% for course, stats in course_stats.items() %}
                             {% if stats.total > 0 %}
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between mb-1">
-                                    <small>{{ cat }}</small>
-                                    <small class="text-muted">{{ stats.hours }}h / {{ stats.done }}/{{ stats.total }}</small>
+                                    <small>{{ course }}</small>
+                                    <small style="color: var(--text-secondary);">{{ stats.hours }}h / {{ stats.done }}/{{ stats.total }}</small>
                                 </div>
                                 <div class="progress" style="height: 6px;">
                                     <div class="progress-bar" style="width: {{ (stats.done / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
@@ -692,5 +892,110 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        function toggleTheme() {
+            fetch('/toggle-theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                location.reload();
+            });
+        }
+        
+        // تنظیمات رنگ برای Chart.js
+        const isDark = document.body.classList.contains('light-theme') ? false : true;
+        const textColor = isDark ? '#f1f5f9' : '#1e293b';
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.2)' : '#e2e8f0';
+        
+        // نمودار هفتگی - فقط یکبار
+        const weekChartCanvas = document.getElementById('weekChart');
+        if (weekChartCanvas && !weekChartCanvas.chartInstance) {
+            const weekData = {{ week_hours | tojson }};
+            const weekLabels = Object.keys(weekData).reverse().map(d => d.substring(5));
+            const weekValues = Object.keys(weekData).reverse().map(k => weekData[k]);
+            
+            weekChartCanvas.chartInstance = new Chart(weekChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: weekLabels,
+                    datasets: [{
+                        label: 'ساعت مطالعه',
+                        data: weekValues,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // نمودار ماهانه - فقط یکبار
+        const monthChartCanvas = document.getElementById('monthChart');
+        if (monthChartCanvas && !monthChartCanvas.chartInstance) {
+            const monthData = {{ month_hours | tojson }};
+            const monthLabels = Object.keys(monthData).reverse().map(d => d.substring(5));
+            const monthValues = Object.keys(monthData).reverse().map(k => monthData[k]);
+            
+            monthChartCanvas.chartInstance = new Chart(monthChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'ساعت مطالعه',
+                        data: monthValues,
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { 
+                                color: textColor,
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
 </body>
 </html>
