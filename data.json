@@ -6,6 +6,16 @@
             "is_admin": true,
             "theme": "dark",
             "tasks": [],
+            "created_at": "2026-02-14",
+            "can_view_others": true
+        },
+        "Hossein": {
+            "password": "13821382",
+            "fullname": "حسین امیری",
+            "is_admin": false,
+            "theme": "dark",
+            "can_view_others": true,
+            "tasks": [],
             "created_at": "2026-02-14"
         }
     },

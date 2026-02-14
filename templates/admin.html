@@ -247,7 +247,10 @@
                 <div class="admin-title">
                     <i class="bi bi-shield-check"></i> پنل مدیریت
                 </div>
-                <div class="admin-subtitle">مدیریت کامل سیستم</div>
+                <div class="admin-subtitle">
+                    <i class="bi bi-calendar3"></i> {{ current_datetime.strftime('%Y/%m/%d') }}
+                    <i class="bi bi-clock ms-2"></i> {{ current_datetime.strftime('%H:%M') }}
+                </div>
             </div>
             <div class="theme-logout-btns">
                 <button class="theme-toggle" onclick="toggleTheme()">
@@ -275,6 +278,30 @@
                 <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
                 <div class="stat-value">{{ total_done_all }}</div>
                 <div class="stat-label">تسک‌های انجام شده</div>
+            </div>
+        </div>
+        
+        <!-- Export/Import Section -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-database"></i> مدیریت دیتابیس (Backup)</h5>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <a href="/admin/export" class="btn btn-success w-100">
+                            <i class="bi bi-download"></i> Export - دانلود بکاپ JSON
+                        </a>
+                        <small class="text-muted d-block mt-2">فایل با تاریخ و ساعت دانلود میشه</small>
+                    </div>
+                    <div class="col-md-6">
+                        <form method="POST" action="/admin/import" enctype="multipart/form-data">
+                            <input type="file" name="json_file" accept=".json" class="form-control mb-2" required>
+                            <button type="submit" class="btn btn-warning w-100">
+                                <i class="bi bi-upload"></i> Import - آپلود JSON
+                            </button>
+                            <small class="text-muted d-block mt-2">بکاپ خودکار قبل از جایگزینی</small>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -312,6 +339,13 @@
                                     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changePasswordModal{{ loop.index0 }}">
                                         <i class="bi bi-key"></i>
                                     </button>
+                                    <form method="POST" class="d-inline">
+                                        <button name="toggle_view_permission" value="{{ user.username }}" 
+                                                class="btn btn-sm {% if user.can_view_others %}btn-success{% else %}btn-secondary{% endif %}"
+                                                title="{% if user.can_view_others %}می‌تونه بقیه رو ببینه{% else %}نمی‌تونه بقیه رو ببینه{% endif %}">
+                                            <i class="bi bi-{% if user.can_view_others %}eye{% else %}eye-slash{% endif %}"></i>
+                                        </button>
+                                    </form>
                                     <form method="POST" class="d-inline" onsubmit="return confirm('حذف شود؟')">
                                         <button name="delete_user" value="{{ user.username }}" class="btn btn-danger btn-sm">
                                             <i class="bi bi-trash"></i>
