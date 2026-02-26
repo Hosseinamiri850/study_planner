@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="{{ lang }}" dir="{{ dir }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -267,12 +267,12 @@
             <div class="stat-card">
                 <div class="stat-icon"><i class="bi bi-clock"></i></div>
                 <div class="stat-value">{{ "%.1f"|format(today_hours) }}</div>
-                <div class="stat-label">ساعت امروز</div>
+                <div class="stat-label">{{ t("stats.today_hours") }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="bi bi-calendar-week"></i></div>
                 <div class="stat-value">{{ "%.1f"|format(total_week_hours) }}</div>
-                <div class="stat-label">ساعت این هفته</div>
+                <div class="stat-label">ساعت {{ t("stats.this_week") }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-icon"><i class="bi bi-check-circle"></i></div>
@@ -301,7 +301,7 @@
                             {% for task in tasks %}
                             <div class="task-item priority-{{ task.priority }} {% if task.done %}done{% endif %}">
                                 <div class="task-title {% if task.done %}done{% endif %}">
-                                    {{ task.title }}
+                                    {{ task.display_title() }}
                                     {% if task.done %}
                                     <i class="bi bi-check-circle-fill text-success"></i>
                                     {% endif %}
@@ -312,7 +312,7 @@
                                 </div>
                                 {% endif %}
                                 <div class="task-meta">
-                                    <span class="task-category">{{ task.title }}</span>
+                                    <span class="task-category">{{ task.display_title() }}</span>
                                     <span class="task-hours">
                                         <i class="bi bi-clock"></i> {{ task.hours }} ساعت
                                     </span>
@@ -335,7 +335,7 @@
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> نمودار هفتگی</h5>
+                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> {{ t("stats.weekly_chart") }}</h5>
                         <div style="height: 200px;">
                             <canvas id="weekChart"></canvas>
                         </div>
@@ -347,7 +347,7 @@
                 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> نمودار ماهانه</h5>
+                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> {{ t("stats.monthly_chart") }}</h5>
                         <div style="height: 200px;">
                             <canvas id="monthChart"></canvas>
                         </div>
@@ -359,12 +359,12 @@
                 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-pie-chart"></i> آمار دروس</h5>
-                        {% for course, stats in course_stats.items() %}
+                        <h5 class="mb-3"><i class="bi bi-pie-chart"></i> {{ t("stats.course_stats") }}</h5>
+                        {% for course_key, stats in course_stats.items() %}
                             {% if stats.total > 0 %}
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between mb-1">
-                                    <small>{{ course }}</small>
+                                    <small>{{ stats.name }}</small>
                                     <small style="color: var(--text-secondary);">{{ stats.hours }}h / {{ stats.done }}/{{ stats.total }}</small>
                                 </div>
                                 <div class="progress" style="height: 6px;">

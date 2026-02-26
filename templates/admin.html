@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="{{ lang }}" dir="{{ dir }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پنل مدیریت - برنامه‌ریز مطالعه</title>
+    <title>{{ t("admin.title") }} - برنامه‌ریز مطالعه</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
@@ -245,7 +245,7 @@
         <div class="admin-header">
             <div>
                 <div class="admin-title">
-                    <i class="bi bi-shield-check"></i> پنل مدیریت
+                    <i class="bi bi-shield-check"></i> {{ t("admin.title") }}
                 </div>
                 <div class="admin-subtitle">مدیریت کامل سیستم</div>
             </div>
@@ -254,7 +254,7 @@
                     <i class="bi bi-{{ 'sun' if theme == 'dark' else 'moon' }}"></i>
                 </button>
                 <a href="/logout" class="btn-logout">
-                    <i class="bi bi-box-arrow-left"></i> خروج
+                    <i class="bi bi-box-arrow-left"></i> {{ t("nav.logout") }}
                 </a>
             </div>
         </div>
@@ -313,7 +313,8 @@
                                         <i class="bi bi-key"></i>
                                     </button>
                                     <form method="POST" class="d-inline" onsubmit="return confirm('حذف شود؟')">
-                                        <button name="delete_user" value="{{ user.username }}" class="btn btn-danger btn-sm">
+                                        <button name="action" value="delete_user"><input type="hidden" name="username" value="{{ user.username }}"></button><!-- fix -->
+                                        <button type="submit" style="display:none">
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
@@ -325,12 +326,12 @@
                                 <div class="modal-dialog">
                                     <div class="modal-content">
                                         <div class="modal-header">
-                                            <h5 class="modal-title">تغییر رمز عبور: {{ user.username }}</h5>
+                                            <h5 class="modal-title">{{ t("admin.change_password") }} عبور: {{ user.username }}</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
                                         <form method="POST">
                                             <div class="modal-body">
-                                                <input type="hidden" name="change_password" value="{{ user.username }}">
+                                                <input type="hidden" name="action" value="change_password" /><input type="hidden" name="username" value="{{ user.username }}">
                                                 <div class="mb-3">
                                                     <label class="form-label">رمز عبور جدید</label>
                                                     <input type="text" name="new_password" class="form-control" required>
@@ -338,7 +339,7 @@
                                             </div>
                                             <div class="modal-footer">
                                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">لغو</button>
-                                                <button type="submit" class="btn btn-primary">تغییر رمز</button>
+                                                <button type="submit" class="btn btn-primary">{{ t("admin.change_password") }}</button>
                                             </div>
                                         </form>
                                     </div>
@@ -351,17 +352,23 @@
             </div>
         </div>
         
-        <!-- مدیریت رشته‌ها و دروس -->
+        <!-- {{ t("admin.majors_management") }} و دروس -->
         <div class="row">
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-body">
                         <h5 class="mb-4"><i class="bi bi-bookmark-plus"></i> افزودن رشته جدید</h5>
                         <form method="POST">
+                            <input type="hidden" name="action" value="add_major">
                             <div class="mb-3">
-                                <input type="text" name="add_major" class="form-control" placeholder="نام رشته..." required>
+                                <label class="form-label small text-muted">فارسی</label>
+                                <input type="text" id="admin-major-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.major_fa_placeholder') }}" required>
                             </div>
-                            <button type="submit" class="btn btn-primary w-100">افزودن رشته</button>
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">English</label>
+                                <input type="text" id="admin-major-en" name="name_en" class="form-control" placeholder="e.g. Electrical Engineering" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary w-100">{{ t("admin.add_major") }}</button>
                         </form>
                     </div>
                 </div>
@@ -372,18 +379,22 @@
                     <div class="card-body">
                         <h5 class="mb-4"><i class="bi bi-book-half"></i> افزودن درس</h5>
                         <form method="POST">
+                            <input type="hidden" name="action" value="add_course">
                             <div class="mb-3">
-                                <select name="major_for_course" class="form-select" required>
+                                <select name="major_key" class="form-select" required>
                                     <option value="">انتخاب رشته...</option>
-                                    {% for major in majors.keys() %}
-                                    <option value="{{ major }}">{{ major }}</option>
+                                    {% for m in majors %}
+                                    <option value="{{ m.key }}">{{ m.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
                             <div class="mb-3">
-                                <input type="text" name="new_course" class="form-control" placeholder="نام درس..." required>
+                                <input type="text" id="admin-course-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.course_fa_placeholder') }}" required>
                             </div>
-                            <button type="submit" name="add_course" value="1" class="btn btn-success w-100">افزودن درس</button>
+                            <div class="mb-3">
+                                <input type="text" id="admin-course-en" name="name_en" class="form-control" placeholder="e.g. Statistics" required>
+                            </div>
+                            <button type="submit" class="btn btn-success w-100">{{ t("admin.add_course") }}</button>
                         </form>
                     </div>
                 </div>
@@ -393,27 +404,29 @@
         <!-- لیست رشته‌ها و دروس -->
         <div class="card">
             <div class="card-body">
-                <h5 class="mb-4"><i class="bi bi-grid-3x3-gap"></i> مدیریت رشته‌ها و دروس</h5>
+                <h5 class="mb-4"><i class="bi bi-grid-3x3-gap"></i> {{ t("admin.majors_management") }} و دروس</h5>
                 <div class="row">
-                    {% for major, major_data in majors.items() %}
+                    {% for m in majors %}
                     <div class="col-md-4 mb-4">
                         <div class="card">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h6 class="mb-0">{{ major }}</h6>
+                                    <h6 class="mb-0">{{ m.name }}</h6>
                                     {% if major != 'کامپیوتر' %}
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('رشته حذف شود؟')">
-                                        <button name="delete_major" value="{{ major }}" class="btn btn-danger btn-sm">
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('{{ t(\'admin.confirm_delete_user\') }}')">
+                                        <input type="hidden" name="action" value="delete_major">
+                                        <input type="hidden" name="major_id" value="{{ m.key }}">
+                                        <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i>
                                             <i class="bi bi-trash"></i>
                                         </button>
                                     </form>
                                     {% endif %}
                                 </div>
                                 <div class="d-flex flex-wrap gap-2">
-                                    {% for course in major_data.courses %}
+                                    {% for c in m.courses %}
                                     <form method="POST" class="d-inline">
                                         <input type="hidden" name="course_major" value="{{ major }}">
-                                        <button type="submit" name="delete_course" value="{{ course }}" class="btn btn-sm btn-outline-secondary" onclick="return confirm('حذف شود؟')">
+                                        <button type="submit" name="action" value="delete_course" /><input type="hidden" name="course_id" value="{{ course }}" class="btn btn-sm btn-outline-secondary" onclick="return confirm('حذف شود؟')">
                                             {{ course }} <i class="bi bi-x"></i>
                                         </button>
                                     </form>
@@ -570,5 +583,12 @@
             });
         }
     </script>
+<script>
+// ── ترجمه خودکار فرم‌های ادمین ──
+document.addEventListener('DOMContentLoaded', () => {
+    AutoTranslate.bind('#admin-major-fa',  '#admin-major-en');
+    AutoTranslate.bind('#admin-course-fa', '#admin-course-en');
+});
+</script>
 </body>
 </html>
