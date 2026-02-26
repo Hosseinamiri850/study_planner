@@ -1,3 +1,4 @@
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, render_template, request, redirect, session, flash, url_for, jsonify
 from flask_sqlalchemy import SQLAlchemy
 import os
@@ -11,7 +12,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "your-secret-key-change-this-in-pr
 # مثال: postgresql://username:password@localhost:5432/study_planner
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
     "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/study_planner"
+    "postgresql+psycopg://postgres:postgres@localhost:5432/study_planner"
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -78,7 +79,7 @@ def init_db():
     if not User.query.filter_by(username="admin").first():
         admin = User(
             username="admin",
-            password="admin",
+            password=generate_password_hash("admin"),
             fullname="مدیر سیستم",
             is_admin=True,
             theme="dark"
@@ -197,7 +198,7 @@ def login():
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
         user = User.query.filter_by(username=username).first()
-        if user and user.password == password:
+        if user and check_password_hash(user.password, password):
             session["username"] = username
             return redirect(url_for("admin_panel") if user.is_admin else url_for("dashboard"))
         flash("نام کاربری یا رمز عبور اشتباه است!", "error")
@@ -216,7 +217,7 @@ def register():
         if User.query.filter_by(username=username).first():
             flash("این نام کاربری قبلاً ثبت شده است!", "error")
         else:
-            db.session.add(User(username=username, password=password, fullname=fullname))
+            db.session.add(User(username=username, password=generate_password_hash(password), fullname=fullname))
             db.session.commit()
             flash("ثبت‌نام با موفقیت انجام شد! وارد شوید.", "success")
             return redirect(url_for("login"))
@@ -260,17 +261,17 @@ def dashboard():
                 db.session.add(Task(user_id=user.id, title=course, description=description, priority=priority, hours=hours))
 
         elif "toggle" in request.form:
-            task = Task.query.get(int(request.form["toggle"]))
+            task = db.session.get(Task, int(request.form["toggle"]))
             if task and task.user_id == user.id:
                 task.done = not task.done
 
         elif "delete" in request.form:
-            task = Task.query.get(int(request.form["delete"]))
+            task = db.session.get(Task, int(request.form["delete"]))
             if task and task.user_id == user.id:
                 db.session.delete(task)
 
         elif "edit_idx" in request.form:
-            task = Task.query.get(int(request.form["edit_idx"]))
+            task = db.session.get(Task, int(request.form["edit_idx"]))
             if task and task.user_id == user.id:
                 new_course = request.form.get("edit_course")
                 if new_course:
@@ -392,7 +393,7 @@ def admin_panel():
             u = User.query.filter_by(username=request.form.get("change_password")).first()
             new_pw = request.form.get("new_password")
             if u and new_pw:
-                u.password = new_pw
+                u.password = generate_password_hash(new_pw)
 
         elif "delete_major" in request.form:
             name = request.form.get("delete_major")
@@ -401,8 +402,8 @@ def admin_panel():
                 if m:
                     db.session.delete(m)
 
-        elif "add_major" in request.form:
-            name = request.form.get("new_major", "").strip()
+        elif "add_major" in request.form or "new_major" in request.form:
+            name = (request.form.get("add_major") or request.form.get("new_major", "")).strip()
             if name and not Major.query.filter_by(name=name).first():
                 db.session.add(Major(name=name))
 

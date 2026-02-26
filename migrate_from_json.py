@@ -5,6 +5,7 @@
 import json
 import os
 from datetime import date
+from werkzeug.security import generate_password_hash
 from app import app, db, User, Major, Course, Task, init_db
 
 JSON_FILE = "data.json"
@@ -56,7 +57,7 @@ def migrate():
 
             user = User(
                 username=username,
-                password=user_data.get("password", ""),
+                password=generate_password_hash(user_data.get("password", "")),
                 fullname=user_data.get("fullname", username),
                 is_admin=user_data.get("is_admin", False),
                 theme=user_data.get("theme", "dark"),
