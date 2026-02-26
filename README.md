@@ -1,279 +1,398 @@
-# 📚 سیستم مدیریت برنامه‌ریز مطالعه گروهی - نسخه 4.0
+<div dir="rtl">
 
-یک سیستم کامل و پیشرفته برای مدیریت تسک‌های مطالعه با قابلیت چند کاربره و پنل ادمین
+# 📚 برنامه‌ریز مطالعه | Study Planner
 
-## ✨ ویژگی‌های نسخه 4.0
+یک اپلیکیشن وب برای ردیابی و مدیریت برنامه مطالعه دانشجویان، ساخته شده با Flask و PostgreSQL.
+پشتیبانی کامل از **فارسی و انگلیسی** با سیستم i18n سفارشی.
 
-### 🎨 تم روشن/تاریک
-- ✅ تم دارک به صورت پیش‌فرض
-- ✅ امکان تغییر تم با یک کلیک
-- ✅ ذخیره تم هر کاربر به صورت جداگانه
-- ✅ طراحی زیبا در هر دو تم
+> **شفافیت:** معماری دیتابیس، سیستم چندزبانه، و ریفکتورینگ کد این پروژه با کمک [Claude](https://claude.ai) (هوش مصنوعی Anthropic) انجام شده. ایده اولیه، طراحی UI، و تصمیمات محصول توسط توسعه‌دهنده گرفته شده. هوش مصنوعی به عنوان یک ابزار قدرتمند استفاده شد، نه جایگزین مهندسی.
 
-### 👥 سیستم چند کاربره پیشرفته
-- ✅ ثبت‌نام با انتخاب رشته تحصیلی
-- ✅ هر کاربر تسک‌های مخصوص خودش
-- ✅ مشاهده تسک‌های دیگران (فقط خواندنی)
-- ✅ مقایسه پیشرفت با سایر کاربران
+</div>
 
-### 🔐 پنل ادمین قدرتمند
-- ✅ یوزرنیم و پسورد: `admin` / `admin`
-- ✅ ادمین برای کاربران عادی نامرئی است
-- ✅ مدیریت کامل کاربران:
-  - حذف کاربر
-  - تغییر رمز عبور کاربران
-  - مشاهده آمار کامل هر کاربر
-- ✅ مدیریت رشته‌ها و دروس:
-  - افزودن رشته جدید
-  - حذف رشته (به جز رشته کامپیوتر)
-  - افزودن درس به هر رشته
-  - حذف درس از رشته
-- ✅ آمار کلی سیستم
+---
 
-### 📝 مدیریت تسک‌ها
-- ✅ **فرم جدید ساده‌تر:**
-  - انتخاب درس (به جای عنوان)
-  - اولویت (کم، متوسط، مهم)
-  - تعداد ساعت
-  - توضیحات (اختیاری)
-- ✅ ویرایش و حذف تسک
-- ✅ علامت‌گذاری انجام شده
-- ✅ ساعات فقط بعد از تیک خوردن به آمار اضافه می‌شوند
+<div dir="rtl">
 
-### 🎓 مدیریت رشته‌ها و دروس
-- ✅ **رشته کامپیوتر پیش‌فرض با 13 درس**
-- ✅ هر کاربر می‌تونه:
-  - رشته جدید اضافه کنه
-  - درس جدید به رشته خودش اضافه کنه
-  - دروس رشته خودش رو حذف کنه
-- ✅ ادمین کنترل کامل روی همه رشته‌ها و دروس داره
+## ✨ ویژگی‌ها
 
-### 📊 آمار و گزارش‌دهی
-- ✅ ساعات مطالعه روزانه
-- ✅ ساعات هفتگی
-- ✅ آمار هر درس (تسک + ساعت)
-- ✅ نوار پیشرفت
-- ✅ مقایسه با کاربران دیگر
+### مدیریت تسک و مطالعه
+- 📝 افزودن تسک‌های درسی با سطح اولویت (مهم / متوسط / کم)
+- ⏱️ ثبت ساعت مطالعه برای هر درس
+- ✅ تیک زدن و پیگیری پیشرفت تسک‌ها
+- ✏️ ویرایش و حذف تسک‌ها
 
-## 🚀 نصب و اجرا
+### آمار و نمودار
+- 📊 نمودار ساعت مطالعه هفتگی (bar chart)
+- 📈 نمودار ساعت مطالعه ماهانه (line chart)
+- 📉 آمار پیشرفت هر درس به صورت جداگانه
+- 🔢 نمایش ساعت مطالعه امروز، این هفته، و این ماه
+
+### کاربران و اجتماع
+- 👥 مشاهده پروفایل و پیشرفت سایر کاربران
+- 🏆 مقایسه ساعت مطالعه با همکلاسی‌ها
+
+### امنیت و احراز هویت
+- 🔐 رمز عبور با bcrypt هش می‌شود (ذخیره ایمن)
+- 🛡️ محافظت از روت‌ها با decorator های login_required و admin_required
+- 👮 پنل ادمین جداگانه با دسترسی محدود
+
+### چندزبانه
+- 🌐 پشتیبانی کامل از **فارسی (RTL) و انگلیسی (LTR)**
+- 🔄 تغییر زبان از هر صفحه بدون از دست دادن اطلاعات
+- 🤖 ترجمه خودکار نام رشته‌ها و دروس هنگام ورود (با LibreTranslate)
+- 📁 سیستم locale با فایل‌های JSON قابل توسعه
+
+### ادمین
+- 👤 مدیریت کاربران (حذف، تغییر رمز)
+- 🏫 مدیریت رشته‌ها و دروس (افزودن، حذف)
+- 📊 آمار کلی سیستم (کاربران فعال، کل تسک‌ها، ساعت مطالعه)
+
+### تجربه کاربری
+- 🌙 تم تاریک / روشن (ذخیره در دیتابیس)
+- 📱 طراحی واکنش‌گرا (موبایل و دسکتاپ)
+- ⚡ انیمیشن‌های روان در UI
+
+</div>
+
+---
+
+## ✨ Features
+
+- 📝 Task management per course with priority levels (High / Medium / Low)
+- ⏱️ Study hour tracking with daily, weekly, and monthly breakdowns
+- 📊 Interactive charts (weekly bar + monthly line) powered by Chart.js
+- 👥 Social view — see other users' progress and study hours
+- 🔐 Secure hashed passwords (Werkzeug / bcrypt)
+- 🌙 Dark / Light theme toggle, saved per user
+- 🌐 Full **Persian ↔ English** i18n with RTL/LTR layout switching
+- 🤖 Auto-translate major/course names via LibreTranslate
+- 🛡️ Admin panel — user management, majors, courses, system stats
+- 🗄️ PostgreSQL + SQLAlchemy ORM (auto-seeded on first run)
+
+---
+
+<div dir="rtl">
+
+## 🏗️ تکنولوژی‌ها
+
+| لایه        | تکنولوژی                        |
+|-------------|----------------------------------|
+| بک‌اند      | Python 3.10+ / Flask 3.0         |
+| دیتابیس     | PostgreSQL 14+ / SQLAlchemy 2.0  |
+| فرانت‌اند   | Bootstrap 5 / Chart.js           |
+| ترجمه خودکار| LibreTranslate (self-hosted)     |
+| i18n        | سیستم JSON locale سفارشی         |
+| استقرار     | Gunicorn                         |
+
+</div>
+
+## 🏗️ Tech Stack
+
+| Layer       | Technology                      |
+|-------------|----------------------------------|
+| Backend     | Python 3.10+ / Flask 3.0        |
+| Database    | PostgreSQL 14+ / SQLAlchemy 2.0 |
+| Frontend    | Bootstrap 5 / Chart.js          |
+| Translation | LibreTranslate (self-hosted)    |
+| i18n        | Custom JSON locale system       |
+| Deployment  | Gunicorn                        |
+
+---
+
+<div dir="rtl">
+
+## 🚀 راه‌اندازی صفر تا صد
 
 ### پیش‌نیازها
+
+قبل از شروع مطمئن شو این‌ها نصب هستن:
+
+- [Python 3.10+](https://www.python.org/downloads/)
+- [PostgreSQL 14+](https://www.postgresql.org/download/) + pgAdmin (اختیاری)
+- Git
+
+---
+
+### مرحله ۱ — دریافت کد
+
 ```bash
-pip install flask
+git clone https://github.com/Hosseinamiri850/study_planner.git
+cd study_planner
 ```
 
-### راه‌اندازی
+---
+
+### مرحله ۲ — نصب وابستگی‌ها
+
+```bash
+pip install -r requirements.txt
+```
+
+خروجی موفق این‌ها رو نصب می‌کنه:
+- `Flask 3.0`
+- `Flask-SQLAlchemy 3.1`
+- `psycopg[binary]` (درایور PostgreSQL)
+- `requests` (برای LibreTranslate)
+- `gunicorn` (سرور production)
+
+---
+
+### مرحله ۳ — ساخت دیتابیس
+
+**روش A — با pgAdmin (گرافیکی):**
+1. pgAdmin رو باز کن
+2. روی `Servers` ← `PostgreSQL` کلیک راست کن
+3. `Create` ← `Database` رو انتخاب کن
+4. نام `study_planner` بذار و Save کن
+
+**روش B — با خط فرمان:**
+```bash
+# ویندوز (PowerShell):
+psql -U postgres -c "CREATE DATABASE study_planner;"
+
+# لینوکس/مک:
+createdb study_planner
+```
+
+---
+
+### مرحله ۴ — تنظیم اتصال دیتابیس
+
+فایل `app.py` رو باز کن و این خط رو پیدا کن:
+
+```python
+"postgresql+psycopg://postgres:postgres@localhost:5432/study_planner"
+```
+
+`postgres` دوم رو با رمز عبور PostgreSQL خودت عوض کن:
+
+```python
+"postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+```
+
+یا با متغیر محیطی (روش بهتر):
+
+```bash
+# ویندوز:
+set DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
+
+# لینوکس/مک:
+export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+```
+
+---
+
+### مرحله ۵ — اجرا
+
 ```bash
 python app.py
 ```
 
-سپس به آدرس زیر بروید:
+در اولین اجرا، برنامه به صورت **خودکار**:
+- ✅ همه جداول دیتابیس رو می‌سازه
+- ✅ اکانت ادمین پیش‌فرض می‌سازه (`admin` / `admin`)
+- ✅ رشته مهندسی کامپیوتر با ۱۳ درس پیش‌فرض وارد می‌کنه
+
+بعد مرورگر رو باز کن و برو به:
 ```
 http://localhost:5000
 ```
+
+> ⚠️ **مهم:** فوری بعد از اولین لاگین، رمز ادمین رو از پنل مدیریت تغییر بده!
+
+---
+
+### مرحله ۶ (اختیاری) — فعال‌سازی ترجمه خودکار
+
+برای ترجمه خودکار فارسی↔انگلیسی هنگام افزودن رشته/درس:
+
+```bash
+# نصب LibreTranslate
+pip install libretranslate
+
+# اجرا (در یه terminal جداگانه)
+libretranslate --host 0.0.0.0 --port 5001
+```
+
+یا اگه نمی‌خوای self-hosted باشه، از public instance استفاده کن — فایل `translator.py` رو باز کن و این خط رو عوض کن:
+
+```python
+LIBRETRANSLATE_URL = "https://translate.argosopentech.com"
+```
+
+بدون LibreTranslate هم برنامه کاملاً کار می‌کنه — فقط ترجمه خودکار غیرفعاله و باید هر دو فیلد فارسی و انگلیسی رو دستی پر کنی.
+
+---
+
+### مرحله ۷ (اختیاری) — استقرار با Gunicorn
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:8000 app:app
+```
+
+</div>
+
+## 🚀 Quick Start (English)
+
+### Prerequisites
+- Python 3.10+
+- PostgreSQL 14+
+- Git
+
+### Step 1 — Clone
+```bash
+git clone https://github.com/Hosseinamiri850/study_planner.git
+cd study_planner
+pip install -r requirements.txt
+```
+
+### Step 2 — Create Database
+```sql
+-- psql or pgAdmin
+CREATE DATABASE study_planner;
+```
+
+### Step 3 — Configure
+Edit `app.py` or set environment variable:
+```bash
+export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+```
+
+### Step 4 — Run
+```bash
+python app.py
+```
+App auto-creates tables, seeds admin (`admin`/`admin`), and seeds default CS courses.
+
+Open → [http://localhost:5000](http://localhost:5000)
+
+### Step 5 (Optional) — Auto-translate
+```bash
+pip install libretranslate
+libretranslate --host 0.0.0.0 --port 5001
+```
+
+---
+
+<div dir="rtl">
+
+## 🗃️ ساختار دیتابیس
+
+```
+users    — id, username, password (hashed), fullname, is_admin, theme, created_at
+majors   — id, key (slug), name_fa, name_en
+courses  — id, key (slug), name_fa, name_en, major_id
+tasks    — id, user_id, course_key, description, done, priority, hours, created_at
+```
+
+رشته‌ها و دروس با **هر دو نام فارسی و انگلیسی** ذخیره می‌شن.
+تسک‌ها `course_key` (یه slug زبان‌خنثی) ذخیره می‌کنن تا در هر زبانی درست نمایش داده بشن.
+
+</div>
+
+## 🗃️ Database Schema
+
+```
+users    — id, username, password (hashed), fullname, is_admin, theme, created_at
+majors   — id, key (slug), name_fa, name_en
+courses  — id, key (slug), name_fa, name_en, major_id
+tasks    — id, user_id, course_key, description, done, priority, hours, created_at
+```
+
+---
+
+<div dir="rtl">
 
 ## 📁 ساختار پروژه
 
 ```
 study_planner/
-│
-├── app.py                  # فایل اصلی Flask
-├── data.json               # پایگاه داده JSON
-├── README.md               # این فایل
+├── app.py              ← بک‌اند اصلی (روت‌ها، مدل‌ها، seed)
+├── translator.py       ← ماژول ترجمه LibreTranslate
+├── requirements.txt
+├── .gitignore
+├── README.md
+├── locales/
+│   ├── fa.json         ← همه متن‌های فارسی UI
+│   └── en.json         ← همه متن‌های انگلیسی UI
 └── templates/
-    ├── login.html          # صفحه ورود (تم دارک)
-    ├── register.html       # صفحه ثبت‌نام (با انتخاب رشته)
-    ├── dashboard.html      # داشبورد کاربر عادی
-    ├── view_user.html      # مشاهده پروفایل کاربران
-    └── admin.html          # پنل مدیریت (فقط ادمین)
+    ├── base.html       ← base template + JS ترجمه خودکار
+    ├── login.html
+    ├── register.html
+    ├── dashboard.html
+    ├── admin.html
+    └── view_user.html
 ```
 
-## 🎯 نحوه استفاده
+## افزودن زبان جدید
 
-### ورود به عنوان ادمین
+۱. فایل `locales/en.json` رو کپی کن به `locales/xx.json`
+۲. همه مقادیر رو ترجمه کن
+۳. در `app.py` مقدار `"xx"` رو به `SUPPORTED_LANGS` اضافه کن
+
+</div>
+
+## 📁 Project Structure
+
 ```
-یوزرنیم: admin
-پسورد: admin
+study_planner/
+├── app.py              ← Main app (routes, models, seed)
+├── translator.py       ← LibreTranslate integration
+├── requirements.txt
+├── .gitignore
+├── README.md
+├── locales/
+│   ├── fa.json         ← Persian UI strings
+│   └── en.json         ← English UI strings
+└── templates/
+    ├── base.html       ← Base template + AutoTranslate JS
+    ├── login.html
+    ├── register.html
+    ├── dashboard.html
+    ├── admin.html
+    └── view_user.html
 ```
-
-### ثبت‌نام کاربر جدید
-1. روی "ثبت‌نام کنید" کلیک کنید
-2. نام و نام خانوادگی را وارد کنید
-3. نام کاربری و رمز عبور انتخاب کنید
-4. **رشته تحصیلی را انتخاب کنید**
-5. ثبت‌نام کنید
-
-### افزودن تسک
-1. **درس** را از لیست انتخاب کنید
-2. **اولویت** را تعیین کنید (🔴 مهم، 🟡 متوسط، 🟢 کم)
-3. **تعداد ساعت** را وارد کنید
-4. در صورت نیاز **توضیحات** اضافه کنید
-5. "افزودن تسک" را بزنید
-
-### تغییر تم
-- روی دکمه تم (آفتاب/ماه) در سایدبار کلیک کنید
-- تم شما ذخیره می‌شود
-
-### مدیریت رشته و دروس (کاربر عادی)
-1. در داشبورد، بخش "مدیریت رشته و دروس" را پیدا کنید
-2. می‌تونید:
-   - رشته جدید اضافه کنید
-   - درس جدید به رشته خودتون اضافه کنید
-   - دروس رشته خودتون رو حذف کنید
-
-### پنل ادمین
-ادمین می‌تونه:
-- **کاربران:**
-  - لیست کامل کاربران با آمار
-  - تغییر رمز هر کاربر
-  - حذف کاربر
-- **رشته‌ها:**
-  - افزودن رشته جدید
-  - حذف رشته (به جز کامپیوتر)
-- **دروس:**
-  - افزودن درس به هر رشته
-  - حذف درس از هر رشته
-
-## 💾 ساختار داده (data.json)
-
-```json
-{
-    "users": {
-        "admin": {
-            "password": "admin",
-            "fullname": "مدیر سیستم",
-            "is_admin": true,
-            "theme": "dark",
-            "tasks": [],
-            "created_at": "2026-02-14"
-        },
-        "ali": {
-            "password": "1234",
-            "fullname": "علی احمدی",
-            "major": "کامپیوتر",
-            "is_admin": false,
-            "theme": "light",
-            "tasks": [
-                {
-                    "title": "ساختمان داده",
-                    "description": "حل تمرین فصل 3",
-                    "done": true,
-                    "priority": "high",
-                    "hours": 2.5,
-                    "created_at": "2026-02-13"
-                }
-            ],
-            "created_at": "2026-02-13"
-        }
-    },
-    "majors": {
-        "کامپیوتر": {
-            "courses": [
-                "ساختمان داده",
-                "طراحی الگوریتم",
-                ...
-            ]
-        },
-        "برق": {
-            "courses": [
-                "مدار 1",
-                "مدار 2",
-                ...
-            ]
-        }
-    }
-}
-```
-
-## 🎨 تغییرات عمده از نسخه 3.0
-
-### ✅ اضافه شده:
-1. **تم روشن/تاریک:**
-   - تم دارک پیش‌فرض
-   - دکمه تغییر تم
-   - ذخیره تم هر کاربر
-
-2. **پنل ادمین:**
-   - مدیریت کامل کاربران
-   - تغییر رمز کاربران
-   - مدیریت رشته‌ها و دروس
-   - آمار کلی سیستم
-   - ادمین برای کاربران عادی نامرئی
-
-3. **مدیریت رشته‌ها:**
-   - هر کاربر می‌تونه رشته اضافه کنه
-   - هر کاربر می‌تونه دروس رشته خودش رو مدیریت کنه
-   - ادمین کنترل کامل داره
-
-4. **فرم تسک جدید:**
-   - حذف فیلد "عنوان"
-   - انتخاب مستقیم درس
-   - فیلد توضیحات اختیاری
-
-### 🔄 بهبود یافته:
-- طراحی UI با پشتیبانی از دو تم
-- فرم ساده‌تر و کاربردی‌تر
-- ساختار داده بهتر
-- کد تمیزتر
-
-## 🔐 امنیت
-
-⚠️ **توجه**: این پروژه برای استفاده شخصی/آموزشی طراحی شده. برای محیط واقعی:
-- رمزها باید Hash شوند (bcrypt)
-- از دیتابیس واقعی استفاده شود
-- HTTPS فعال شود
-- رمز ادمین تغییر کند
-
-## 📊 لیست دروس پیش‌فرض (رشته کامپیوتر)
-
-1. ساختمان داده
-2. طراحی الگوریتم
-3. هوش مصنوعی
-4. نظریه زبان
-5. مدار منطقی
-6. معماری
-7. سیستم عامل
-8. شبکه های کامپیوتری
-9. پایگاه داده
-10. ریاضی 1
-11. ریاضی 2
-12. احتمال
-13. گسسته
-
-## 💡 نکات مهم
-
-1. **ادمین:**
-   - یوزرنیم و پسورد: `admin` / `admin`
-   - برای کاربران عادی نامرئی است
-   - نمی‌تونه تسک اضافه کنه (فقط مدیریت)
-
-2. **تم:**
-   - پیش‌فرض دارک
-   - هر کاربر تم خودش رو داره
-   - با یک کلیک تغییر می‌کنه
-
-3. **رشته‌ها:**
-   - رشته کامپیوتر قابل حذف نیست
-   - هر کاربر رشته جدید اضافه کنه
-   - فقط ادمین می‌تونه رشته حذف کنه
-
-4. **دروس:**
-   - کاربران فقط دروس رشته خودشون رو می‌بینن
-   - هر کاربر می‌تونه به رشته خودش درس اضافه/حذف کنه
-   - ادمین به همه دروس دسترسی داره
-
-## 🔧 عیب‌یابی
-
-**مشکل: ادمین نمی‌تونه تسک اضافه کنه**
-- این طبیعیه! ادمین فقط برای مدیریت هست
-
-**مشکل: کاربران ادمین رو می‌بینن**
-- ادمین از لیست کاربران حذف شده و نامرئیه
-
-**مشکل: تم ذخیره نمی‌شه**
-- مطمئن شید فایل `data.json` قابل نوشتن هست
 
 ---
 
-ساخته شده با ❤️ برای دانشجویان
-نسخه 4.0 - آخرین بروزرسانی: 14 فوریه 2026
+<div dir="rtl">
+
+## 👤 اکانت ادمین پیش‌فرض
+
+| فیلد        | مقدار   |
+|-------------|---------|
+| نام کاربری  | `admin` |
+| رمز عبور   | `admin` |
+
+> ⚠️ بلافاصله بعد از اولین لاگین رمز رو از طریق پنل مدیریت تغییر بده.
+
+</div>
+
+## 👤 Default Admin Credentials
+
+| Field    | Value   |
+|----------|---------|
+| Username | `admin` |
+| Password | `admin` |
+
+> ⚠️ Change the admin password immediately after first login via the Admin Panel.
+
+---
+
+<div dir="rtl">
+
+## 🤝 مشارکت
+
+Pull request ها خوش‌آمد هستند. برای تغییرات بزرگ اول یه issue باز کن.
+
+</div>
+
+## 🤝 Contributing
+
+Pull requests are welcome. For major changes, please open an issue first.
+
+---
+
+## 📄 License
+
+MIT © [Hossein Amiri](https://github.com/Hosseinamiri850)

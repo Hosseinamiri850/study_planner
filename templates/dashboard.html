@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="{{ lang }}" dir="{{ dir }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>داشبورد - برنامه‌ریز مطالعه</title>
+    <title>{{ t("dashboard.my_tasks") }} - {{ t("app_name") }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
@@ -581,57 +581,57 @@
         
         <div class="sidebar-stats">
             <div class="stat-item">
-                <div class="stat-label">ساعت امروز</div>
+                <div class="stat-label">{{ t("stats.today_hours") }}</div>
                 <div class="stat-value">{{ "%.1f"|format(today_hours) }} <small>ساعت</small></div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">این هفته</div>
+                <div class="stat-label">{{ t("stats.this_week") }}</div>
                 <div class="stat-value">{{ "%.1f"|format(total_week_hours) }} <small>ساعت</small></div>
             </div>
             <div class="stat-item">
-                <div class="stat-label">تسک‌های انجام شده</div>
+                <div class="stat-label">{{ t("stats.done_tasks") }}</div>
                 <div class="stat-value">{{ total_done }} <small>از {{ total_tasks }}</small></div>
             </div>
         </div>
         
         <button class="theme-toggle" onclick="toggleTheme()">
-            <i class="bi bi-{{ 'sun' if theme == 'dark' else 'moon' }}"></i> 
+            <i class="bi bi-{{ "sun" if theme == "dark" else "moon" }}"></i> 
             تم {{ 'روشن' if theme == 'dark' else 'تاریک' }}
         </button>
         
         <a href="/logout" class="btn-logout">
-            <i class="bi bi-box-arrow-left"></i> خروج
+            <i class="bi bi-box-arrow-left"></i> {{ t("nav.logout") }}
         </a>
     </div>
     
     <!-- Main Content -->
     <div class="main-content">
         <div class="page-header">
-            <h1 class="page-title">سلام، {{ fullname }}! 👋</h1>
-            <p class="page-subtitle">امروز {{ today }}</p>
+            <h1 class="page-title">{{ t("dashboard.greeting", name=fullname) }} 👋</h1>
+            <p class="page-subtitle">{{ t("dashboard.today") }}: {{ today }}</p>
         </div>
         
         <!-- Add Task Card -->
         <div class="card add-task-card">
             <div class="card-body">
-                <h5><i class="bi bi-plus-circle"></i> تسک جدید اضافه کن</h5>
+                <h5><i class="bi bi-plus-circle"></i> {{ t("dashboard.add_task") }}</h5>
                 <form method="POST">
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label">درس</label>
-                            <select name="course" class="form-select" required>
-                                <option value="">انتخاب کنید...</option>
+                            <select name="course_key" class="form-select" required>
+                                <option value="">{{ t("dashboard.select_course") }}</option>
                                 {% for course in courses %}
-                                <option value="{{ course }}">{{ course }}</option>
+                                <option value="{{ course.key }}">{{ course.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">اولویت</label>
                             <select name="priority" class="form-select">
-                                <option value="high">🔴 مهم</option>
-                                <option value="medium" selected>🟡 متوسط</option>
-                                <option value="low">🟢 کم</option>
+                                <option value="high">🔴 {{ t("priority.high") }}</option>
+                                <option value="medium" selected>🟡 {{ t("priority.medium") }}</option>
+                                <option value="low">🟢 {{ t("priority.low") }}</option>
                             </select>
                         </div>
                         <div class="col-md-2">
@@ -640,13 +640,13 @@
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">&nbsp;</label>
-                            <button type="submit" name="new_task" value="1" class="btn btn-add-task w-100">
-                                <i class="bi bi-plus-lg"></i> افزودن تسک
+                            <button type="submit" name="action" value="new_task" class="btn btn-add-task w-100">
+                                <i class="bi bi-plus-lg"></i> {{ t("dashboard.add_task_btn") }}
                             </button>
                         </div>
                         <div class="col-12">
                             <label class="form-label">توضیحات (اختیاری)</label>
-                            <textarea name="description" class="form-control form-textarea" rows="2" placeholder="توضیحات بیشتر..."></textarea>
+                            <textarea name="description" class="form-control form-textarea" rows="2" placeholder="{{ t('dashboard.description_placeholder') }}"></textarea>
                         </div>
                     </div>
                 </form>
@@ -659,7 +659,7 @@
                 <div class="card">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-center mb-4">
-                            <h5 class="mb-0"><i class="bi bi-list-task"></i> تسک‌های من</h5>
+                            <h5 class="mb-0"><i class="bi bi-list-task"></i> {{ t("dashboard.my_tasks") }}</h5>
                             <div class="progress" style="width: 200px;">
                                 <div class="progress-bar" style="width: {{ (total_done / total_tasks * 100) if total_tasks > 0 else 0 }}%"></div>
                             </div>
@@ -671,7 +671,7 @@
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="flex-grow-1">
                                         <div class="task-title {% if task.done %}done{% endif %}">
-                                            {{ task.title }}
+                                            {{ task.display_title() }}
                                         </div>
                                         {% if task.description %}
                                         <div class="task-description">
@@ -679,7 +679,7 @@
                                         </div>
                                         {% endif %}
                                         <div class="task-meta">
-                                            <span class="task-category">{{ task.title }}</span>
+                                            <span class="task-category">{{ task.display_title() }}</span>
                                             <span class="task-hours">
                                                 <i class="bi bi-clock"></i> {{ task.hours }} ساعت
                                             </span>
@@ -692,13 +692,13 @@
                                         <button class="btn-action btn-edit" data-bs-toggle="modal" data-bs-target="#editModal{{ task.id }}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
-                                        <form method="POST" class="d-inline" onsubmit="return confirm('مطمئنی؟')">
-                                            <button name="delete" value="{{ task.id }}" class="btn-action btn-delete">
+                                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t("dashboard.confirm_delete") }}')">
+                                            <button name="action" value="delete" class="btn-action btn-delete"><input type="hidden" name="task_id" value="{{ task.id }}">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </form>
                                         <form method="POST" class="d-inline">
-                                            <button name="toggle" value="{{ task.id }}" class="btn-action btn-toggle {% if task.done %}done{% endif %}">
+                                            <button name="action" value="toggle" class="btn-action btn-toggle {% if task.done %}done{% endif %}"><input type="hidden" name="task_id" value="{{ task.id }}">
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </form>
@@ -711,15 +711,15 @@
                                 <div class="modal-dialog">
                                     <div class="modal-content">
                                         <div class="modal-header">
-                                            <h5 class="modal-title">ویرایش تسک</h5>
+                                            <h5 class="modal-title">{{ t("dashboard.edit_task") }}</h5>
                                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                         </div>
                                         <form method="POST">
                                             <div class="modal-body">
-                                                <input type="hidden" name="edit_idx" value="{{ task.id }}">
+                                                <input type="hidden" name="action" value="edit"><input type="hidden" name="task_id" value="{{ task.id }}">
                                                 <div class="mb-3">
                                                     <label class="form-label">درس</label>
-                                                    <select name="edit_course" class="form-select" required>
+                                                    <select name="course_key" class="form-select" required>
                                                         {% for course in courses %}
                                                         <option value="{{ course }}" {% if course == task.title %}selected{% endif %}>{{ course }}</option>
                                                         {% endfor %}
@@ -727,24 +727,24 @@
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label">اولویت</label>
-                                                    <select name="edit_priority" class="form-select">
-                                                        <option value="high" {% if task.priority == 'high' %}selected{% endif %}>🔴 مهم</option>
-                                                        <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>🟡 متوسط</option>
-                                                        <option value="low" {% if task.priority == 'low' %}selected{% endif %}>🟢 کم</option>
+                                                    <select name="priority" class="form-select">
+                                                        <option value="high" {% if task.priority == 'high' %}selected{% endif %}>🔴 {{ t("priority.high") }}</option>
+                                                        <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>🟡 {{ t("priority.medium") }}</option>
+                                                        <option value="low" {% if task.priority == 'low' %}selected{% endif %}>🟢 {{ t("priority.low") }}</option>
                                                     </select>
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label">ساعت</label>
-                                                    <input type="number" step="0.5" name="edit_hours" class="form-control" value="{{ task.hours }}" required>
+                                                    <input type="number" step="0.5" name="task_hours" class="form-control" value="{{ task.hours }}" required>
                                                 </div>
                                                 <div class="mb-3">
                                                     <label class="form-label">توضیحات (اختیاری)</label>
-                                                    <textarea name="edit_description" class="form-control form-textarea" rows="3">{{ task.description }}</textarea>
+                                                    <textarea name="description" class="form-control form-textarea" rows="3">{{ task.description }}</textarea>
                                                 </div>
                                             </div>
                                             <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">لغو</button>
-                                                <button type="submit" class="btn btn-primary">ذخیره</button>
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t("dashboard.cancel") }}</button>
+                                                <button type="submit" class="btn btn-primary">{{ t("dashboard.save") }}</button>
                                             </div>
                                         </form>
                                     </div>
@@ -754,7 +754,7 @@
                         {% else %}
                             <div class="empty-state">
                                 <i class="bi bi-inbox"></i>
-                                <p>هنوز تسکی اضافه نکردی!</p>
+                                <p>{{ t("dashboard.no_tasks") }}</p>
                             </div>
                         {% endif %}
                     </div>
@@ -763,52 +763,68 @@
                 <!-- Manage Majors and Courses -->
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-gear"></i> مدیریت رشته و دروس</h5>
-                        
+                        <h5 class="mb-3"><i class="bi bi-gear"></i> {{ t("dashboard.manage_majors") }}</h5>
+
                         <div class="manage-section">
-                            <h6>افزودن رشته جدید</h6>
+                            <h6>{{ t("dashboard.add_major") }}</h6>
                             <form method="POST" class="row g-2">
-                                <div class="col-9">
-                                    <input type="text" name="new_major" class="form-control" placeholder="نام رشته جدید..." required>
+                                <input type="hidden" name="action" value="add_major">
+                                <div class="col-5">
+                                    <label class="form-label small text-muted mb-1">فارسی</label>
+                                    <input type="text" id="dash-major-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.major_fa_placeholder') }}" required>
                                 </div>
-                                <div class="col-3">
-                                    <button type="submit" class="btn btn-primary w-100">افزودن</button>
+                                <div class="col-5">
+                                    <label class="form-label small text-muted mb-1">English</label>
+                                    <input type="text" id="dash-major-en" name="name_en" class="form-control" placeholder="e.g. Electrical Engineering" required>
+                                </div>
+                                <div class="col-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus"></i></button>
                                 </div>
                             </form>
                         </div>
-                        
+
                         <div class="manage-section">
-                            <h6>افزودن درس به رشته</h6>
+                            <h6>{{ t("dashboard.add_course_to_major") }}</h6>
                             <form method="POST" class="row g-2">
-                                <div class="col-5">
-                                    <select name="major_for_course" class="form-select" required>
-                                        {% for major, major_data in majors.items() %}
-                                        <option value="{{ major }}" {% if major == user_major %}selected{% endif %}>{{ major }}</option>
+                                <input type="hidden" name="action" value="add_course">
+                                <div class="col-3">
+                                    <label class="form-label small text-muted mb-1">{{ t("dashboard.course") }}</label>
+                                    <select name="major_key" class="form-select" required>
+                                        {% for m in majors %}
+                                        <option value="{{ m.key }}">{{ m.name }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-5">
-                                    <input type="text" name="new_course" class="form-control" placeholder="نام درس..." required>
+                                <div class="col-3">
+                                    <label class="form-label small text-muted mb-1">فارسی</label>
+                                    <input type="text" id="dash-course-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.course_fa_placeholder') }}" required>
                                 </div>
-                                <div class="col-2">
-                                    <button type="submit" name="add_course" value="1" class="btn btn-success w-100">افزودن</button>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted mb-1">English</label>
+                                    <input type="text" id="dash-course-en" name="name_en" class="form-control" placeholder="e.g. Statistics" required>
+                                </div>
+                                <div class="col-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus"></i></button>
                                 </div>
                             </form>
                         </div>
-                        
+
+                        {% for m in majors %}
                         <div class="manage-section">
-                            <h6>دروس رشته {{ user_major }}</h6>
+                            <h6>{{ m.name }}</h6>
                             <div class="d-flex flex-wrap gap-2">
-                                {% for course in courses %}
-                                <form method="POST" class="d-inline">
-                                    <input type="hidden" name="delete_major" value="{{ user_major }}">
-                                    <button type="submit" name="delete_course" value="{{ course }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('حذف شود؟')">
-                                        {{ course }} <i class="bi bi-x"></i>
+                                {% for c in m.courses %}
+                                <form method="POST" class="d-inline" onsubmit="return confirm('{{ t("dashboard.confirm_delete") }}')">
+                                    <input type="hidden" name="action" value="delete_course">
+                                    <input type="hidden" name="course_id" value="{{ c.id if c.id is defined else c.key }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        {{ c.name }} <i class="bi bi-x"></i>
                                     </button>
                                 </form>
                                 {% endfor %}
                             </div>
                         </div>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -817,36 +833,36 @@
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> نمودار هفتگی</h5>
+                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> {{ t("stats.weekly_chart") }}</h5>
                         <div style="height: 200px;">
                             <canvas id="weekChart"></canvas>
                         </div>
                         <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
-                            مجموع: {{ "%.1f"|format(total_week_hours) }} ساعت
+                            {{ t("stats.total") }}: {{ "%.1f"|format(total_week_hours) }} {{ t("stats.hours_unit") }}
                         </p>
                     </div>
                 </div>
                 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> نمودار ماهانه</h5>
+                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> {{ t("stats.monthly_chart") }}</h5>
                         <div style="height: 200px;">
                             <canvas id="monthChart"></canvas>
                         </div>
                         <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
-                            مجموع: {{ "%.1f"|format(total_month_hours) }} ساعت
+                            {{ t("stats.total") }}: {{ "%.1f"|format(total_month_hours) }} {{ t("stats.hours_unit") }}
                         </p>
                     </div>
                 </div>
                 
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="mb-3"><i class="bi bi-pie-chart"></i> آمار دروس</h5>
-                        {% for course, stats in course_stats.items() %}
+                        <h5 class="mb-3"><i class="bi bi-pie-chart"></i> {{ t("stats.course_stats") }}</h5>
+                        {% for course_key, stats in course_stats.items() %}
                             {% if stats.total > 0 %}
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between mb-1">
-                                    <small>{{ course }}</small>
+                                    <small>{{ stats.name }}</small>
                                     <small style="color: var(--text-secondary);">{{ stats.hours }}h / {{ stats.done }}/{{ stats.total }}</small>
                                 </div>
                                 <div class="progress" style="height: 6px;">
@@ -863,7 +879,7 @@
         <!-- All Users Section -->
         <div class="card">
             <div class="card-body">
-                <h5 class="mb-3"><i class="bi bi-people"></i> همه کاربران</h5>
+                <h5 class="mb-3"><i class="bi bi-people"></i> {{ t("dashboard.all_users") }}</h5>
                 <div class="users-grid">
                     {% for user in all_users %}
                     <a href="/user/{{ user.username }}" class="user-card {% if user.is_current %}current-user{% endif %}">
@@ -873,15 +889,15 @@
                         <div class="user-card-stats">
                             <div class="user-stat">
                                 <div class="user-stat-value">{{ user.done_tasks }}</div>
-                                <div class="user-stat-label">انجام شده</div>
+                                <div class="user-stat-label">{{ t("users.done") }}</div>
                             </div>
                             <div class="user-stat">
                                 <div class="user-stat-value">{{ user.total_tasks }}</div>
-                                <div class="user-stat-label">کل تسک</div>
+                                <div class="user-stat-label">{{ t("users.total_tasks") }}</div>
                             </div>
                             <div class="user-stat">
                                 <div class="user-stat-value">{{ "%.1f"|format(user.today_hours) }}</div>
-                                <div class="user-stat-label">ساعت امروز</div>
+                                <div class="user-stat-label">{{ t("stats.today_hours") }}</div>
                             </div>
                         </div>
                     </a>
@@ -996,6 +1012,10 @@
                 }
             });
         }
-    </script>
+    
+        // ── ترجمه خودکار فرم‌های رشته و درس ──
+        AutoTranslate.bind('#dash-major-fa',  '#dash-major-en');
+        AutoTranslate.bind('#dash-course-fa', '#dash-course-en');
+</script>
 </body>
 </html>
