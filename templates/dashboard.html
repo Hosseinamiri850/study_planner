@@ -689,16 +689,16 @@
                                         </div>
                                     </div>
                                     <div class="task-actions">
-                                        <button class="btn-action btn-edit" data-bs-toggle="modal" data-bs-target="#editModal{{ loop.index0 }}">
+                                        <button class="btn-action btn-edit" data-bs-toggle="modal" data-bs-target="#editModal{{ task.id }}">
                                             <i class="bi bi-pencil"></i>
                                         </button>
                                         <form method="POST" class="d-inline" onsubmit="return confirm('مطمئنی؟')">
-                                            <button name="delete" value="{{ loop.index0 }}" class="btn-action btn-delete">
+                                            <button name="delete" value="{{ task.id }}" class="btn-action btn-delete">
                                                 <i class="bi bi-trash"></i>
                                             </button>
                                         </form>
                                         <form method="POST" class="d-inline">
-                                            <button name="toggle" value="{{ loop.index0 }}" class="btn-action btn-toggle {% if task.done %}done{% endif %}">
+                                            <button name="toggle" value="{{ task.id }}" class="btn-action btn-toggle {% if task.done %}done{% endif %}">
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </form>
@@ -707,7 +707,7 @@
                             </div>
                             
                             <!-- Edit Modal -->
-                            <div class="modal fade" id="editModal{{ loop.index0 }}">
+                            <div class="modal fade" id="editModal{{ task.id }}">
                                 <div class="modal-dialog">
                                     <div class="modal-content">
                                         <div class="modal-header">
@@ -716,7 +716,7 @@
                                         </div>
                                         <form method="POST">
                                             <div class="modal-body">
-                                                <input type="hidden" name="edit_idx" value="{{ loop.index0 }}">
+                                                <input type="hidden" name="edit_idx" value="{{ task.id }}">
                                                 <div class="mb-3">
                                                     <label class="form-label">درس</label>
                                                     <select name="edit_course" class="form-select" required>
