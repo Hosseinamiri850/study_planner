@@ -16,6 +16,19 @@ flask --app app seed-reference-data  # optional: bundled majors and courses
 python app.py
 ```
 
+For a database created by the pre-migration version of the application, take a
+backup first, then record the matching baseline before upgrading:
+
+```bash
+flask --app app db stamp 20260723_01
+flask --app app db upgrade
+```
+
+The second revision adds `Task.status`, `Task.estimated_hours`, an optional
+`Task.course_id`, completion metadata, and the `StudySession` table. Legacy
+`course_key`, `hours`, and `done` columns are retained for compatibility while
+the application transitions to the normalized model.
+
 `seed-reference-data` deliberately creates **no administrator account**. Create
 users through registration, then assign administrative access using an audited
 deployment/admin process. Existing databases should be backed up and stamped or

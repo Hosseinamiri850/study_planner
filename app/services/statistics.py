@@ -52,6 +52,14 @@ def course_stats(tasks, courses):
 
 def majors_for_template():
     return [
-        {"key": major.key, "name": major.display_name(), "courses": [{"key": course.key, "name": course.display_name()} for course in major.courses]}
+        {
+            "id": major.id,
+            "key": major.key,
+            "name": major.display_name(),
+            "courses": [
+                {"id": course.id, "key": course.key, "name": course.display_name()}
+                for course in major.courses
+            ],
+        }
         for major in Major.query.order_by(Major.name_en).all()
     ]

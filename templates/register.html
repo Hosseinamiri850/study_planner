@@ -70,5 +70,10 @@
             </div>
         </div>
     </div>
+<script>
+document.querySelectorAll('form[method="POST"]').forEach((form) => {
+    form.insertAdjacentHTML('afterbegin', '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">');
+});
+</script>
 </body>
 </html>

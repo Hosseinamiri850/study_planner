@@ -913,7 +913,7 @@
         function toggleTheme() {
             fetch('/toggle-theme', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'}
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}'}
             })
             .then(response => response.json())
             .then(data => {
@@ -1016,6 +1016,11 @@
         // ── ترجمه خودکار فرم‌های رشته و درس ──
         AutoTranslate.bind('#dash-major-fa',  '#dash-major-en');
         AutoTranslate.bind('#dash-course-fa', '#dash-course-en');
+</script>
+<script>
+document.querySelectorAll('form[method="POST"]').forEach((form) => {
+    form.insertAdjacentHTML('afterbegin', '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">');
+});
 </script>
 </body>
 </html>
