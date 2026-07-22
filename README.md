@@ -5,8 +5,9 @@
 ## Development and database migrations
 
 Copy `.env.example` to `.env` and provide your own `SECRET_KEY` and
-`DATABASE_URL`. The application reads environment variables directly; load the
-file through your shell or deployment platform.
+`DATABASE_URL`. `SECRET_KEY` is required; the application will refuse to start
+without it. The `.env` file is loaded for local development and must never be
+committed.
 
 Run migrations before starting the server:
 
@@ -43,6 +44,23 @@ app/
   extensions.py Flask extension instances
   config.py     environment-backed configuration
 ```
+
+## REST API
+
+The API is ready for a mobile client or a future SPA. Authentication endpoints
+return a signed access token valid for 24 hours; send it with every protected
+request as `Authorization: Bearer <access_token>`.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/api/auth/register` | Create a user and return an access token |
+| POST | `/api/auth/login` | Sign in and return an access token |
+| GET / POST | `/api/tasks` | List or create the authenticated user's tasks |
+| PUT / DELETE | `/api/tasks/:id` | Update or remove one owned task |
+| GET | `/api/statistics/dashboard` | Retrieve dashboard metrics |
+
+The browser routes continue to use session authentication and CSRF protection;
+the mobile API's mutating endpoints accept bearer tokens only.
 
 ---
 
