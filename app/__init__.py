@@ -13,6 +13,8 @@ def create_app(config_object=None):
     """Create a configured Study Planner application instance."""
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.config.from_object(config_object or Config)
+    if not app.config.get("SECRET_KEY"):
+        raise RuntimeError("SECRET_KEY must be set in the environment or .env file.")
 
     db.init_app(app)
     migrate.init_app(app, db)
