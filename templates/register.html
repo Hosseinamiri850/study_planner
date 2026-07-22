@@ -34,8 +34,8 @@
 </head>
 <body>
     <div class="lang-switcher">
-        <a href="{{ url_for('set_lang', lang='fa') }}" class="{{ 'active' if lang == 'fa' }}">فا</a>
-        <a href="{{ url_for('set_lang', lang='en') }}" class="{{ 'active' if lang == 'en' }}">EN</a>
+        <a href="{{ url_for('web.set_lang', lang='fa') }}" class="{{ 'active' if lang == 'fa' }}">فا</a>
+        <a href="{{ url_for('web.set_lang', lang='en') }}" class="{{ 'active' if lang == 'en' }}">EN</a>
     </div>
     <div class="register-container">
         <div class="register-card">
@@ -66,7 +66,7 @@
             </form>
             <div class="login-link">
                 {{ t('auth.have_account') }}
-                <a href="{{ url_for('login') }}">{{ t('auth.login_link') }}</a>
+                <a href="{{ url_for('web.login') }}">{{ t('auth.login_link') }}</a>
             </div>
         </div>
     </div>
