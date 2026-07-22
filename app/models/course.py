@@ -25,6 +25,7 @@ class Course(db.Model):
     name_en = db.Column(db.String(150), nullable=False)
     major_id = db.Column(db.Integer, db.ForeignKey("majors.id"), nullable=False)
     major = db.relationship("Major", back_populates="courses")
+    tasks = db.relationship("Task", back_populates="course")
 
     __table_args__ = (db.UniqueConstraint("key", "major_id", name="uq_course_major"),)
 

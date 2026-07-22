@@ -30,7 +30,7 @@ const AutoTranslate = (() => {
         try {
             const res = await fetch('/api/translate', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
                 body: JSON.stringify({ text })
             });
             if (!res.ok) return null;

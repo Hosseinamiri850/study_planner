@@ -8,6 +8,7 @@ from app.models import Course, Major, Task, User
 from app.routes.web import _create_course, _create_major
 from app.services.statistics import majors_for_template
 from app.utils.auth import admin_required
+from app.utils.validation import valid_password
 
 
 admin_bp = Blueprint("admin", __name__)
@@ -45,7 +46,7 @@ def _handle_admin_action():
         if user and not user.is_admin: db.session.delete(user)
     elif action == "change_password":
         user, password = User.query.filter_by(username=request.form.get("username")).first(), request.form.get("new_password", "").strip()
-        if user and password: user.password = generate_password_hash(password)
+        if user and valid_password(password): user.password = generate_password_hash(password)
     elif action == "add_major": _create_major(request.form)
     elif action == "delete_major":
         major = db.session.get(Major, request.form.get("major_id", type=int))
@@ -53,5 +54,8 @@ def _handle_admin_action():
     elif action == "add_course": _create_course(request.form)
     elif action == "delete_course":
         course = db.session.get(Course, request.form.get("course_id", type=int))
-        if course: db.session.delete(course)
+        if course:
+            # Preserve historical tasks when an administrator removes a course.
+            Task.query.filter_by(course_id=course.id).update({"course_id": None})
+            db.session.delete(course)
     db.session.commit()
