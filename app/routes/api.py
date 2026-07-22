@@ -152,6 +152,7 @@ def dashboard_statistics():
 
 
 @api_bp.route("/translate", methods=["POST"])
+@csrf.exempt
 @login_required
 def translate():
     text = (request.get_json(silent=True) or {}).get("text", "").strip()
