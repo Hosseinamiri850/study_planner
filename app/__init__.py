@@ -4,7 +4,7 @@ import click
 from flask import Flask
 
 from app.config import Config
-from app.extensions import db, migrate
+from app.extensions import csrf, db, migrate
 from app.services.seed import seed_reference_data
 from app.utils.i18n import inject_i18n
 
@@ -16,6 +16,7 @@ def create_app(config_object=None):
 
     db.init_app(app)
     migrate.init_app(app, db)
+    csrf.init_app(app)
 
     from app.routes.admin import admin_bp
     from app.routes.api import api_bp

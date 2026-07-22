@@ -8,6 +8,7 @@ from app.models import Course, Major, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
 from app.utils.auth import current_user, login_required
 from app.utils.i18n import SUPPORTED_LANGS, t
+from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
 
 
 web_bp = Blueprint("web", __name__)
@@ -45,6 +46,8 @@ def register():
         username, password, fullname = (request.form.get(field, "").strip() for field in ("username", "password", "fullname"))
         if not username or not password or not fullname:
             flash(t("auth.fill_all_fields"), "error")
+        elif not valid_username(username) or not valid_password(password):
+            flash("Username must be 3–80 letters, numbers, or underscores; password must be at least 8 characters.", "error")
         elif User.query.filter_by(username=username).first():
             flash(t("auth.username_taken"), "error")
         else:
@@ -91,18 +94,25 @@ def _handle_dashboard_action(user):
     action = request.form.get("action")
     task = db.session.get(Task, request.form.get("task_id", type=int)) if action in {"toggle", "delete", "edit"} else None
     if action == "new_task" and request.form.get("course_key"):
-        try:
-            hours = float(request.form.get("task_hours", "0"))
-        except ValueError:
-            hours = 0.0
-        db.session.add(Task(user_id=user.id, course_key=request.form["course_key"], description=request.form.get("description", "").strip(), priority=request.form.get("priority", "medium"), hours=hours))
+        hours = positive_hours(request.form.get("task_hours"))
+        if hours is None or not valid_priority(request.form.get("priority", "medium")):
+            flash("Enter valid task hours (0–24) and priority.", "error")
+            return
+        course_key = request.form["course_key"]
+        course = Course.query.filter_by(key=course_key).first()
+        db.session.add(Task(user_id=user.id, course_key=course_key, course_id=course.id if course else None, title=course.display_name() if course else course_key, description=request.form.get("description", "").strip(), priority=request.form.get("priority", "medium"), hours=hours, estimated_hours=hours))
     elif task and task.user_id == user.id:
-        if action == "toggle": task.done = not task.done
+        if action == "toggle":
+            task.mark_pending() if task.done else task.mark_complete()
         elif action == "delete": db.session.delete(task)
         elif action == "edit":
             task.course_key, task.priority, task.description = request.form.get("course_key", task.course_key), request.form.get("priority", task.priority), request.form.get("description", "")
-            try: task.hours = float(request.form.get("task_hours", "0"))
-            except ValueError: pass
+            task.course = Course.query.filter_by(key=task.course_key).first()
+            task.title = task.course.display_name() if task.course else task.course_key
+            hours = positive_hours(request.form.get("task_hours"))
+            if hours is not None:
+                task.hours = hours
+                task.estimated_hours = hours
     elif action == "add_major":
         _create_major(request.form)
     elif action == "add_course":
