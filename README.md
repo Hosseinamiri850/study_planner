@@ -1,3 +1,38 @@
+> **Architecture update (P0):** the application now uses an application factory,
+> blueprints, isolated models/services, and Alembic migrations. Tables are no
+> longer created when the server starts.
+
+## Development and database migrations
+
+Copy `.env.example` to `.env` and provide your own `SECRET_KEY` and
+`DATABASE_URL`. The application reads environment variables directly; load the
+file through your shell or deployment platform.
+
+Run migrations before starting the server:
+
+```bash
+flask --app app db upgrade
+flask --app app seed-reference-data  # optional: bundled majors and courses
+python app.py
+```
+
+`seed-reference-data` deliberately creates **no administrator account**. Create
+users through registration, then assign administrative access using an audited
+deployment/admin process. Existing databases should be backed up and stamped or
+migrated according to their current Alembic state before deployment.
+
+```text
+app/
+  models/       SQLAlchemy entities
+  routes/       web, admin, and API blueprints
+  services/     statistics and explicit seed operations
+  utils/        authentication and i18n helpers
+  extensions.py Flask extension instances
+  config.py     environment-backed configuration
+```
+
+---
+
 <div dir="rtl">
 
 # 📚 برنامه‌ریز مطالعه | Study Planner

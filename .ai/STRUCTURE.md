@@ -40,7 +40,10 @@ Main responsibilities are mixed:
 - database setup
 
 
-This structure works for small projects but creates maintenance problems.
+The P0 foundation refactor is complete: application setup lives in `app/__init__.py`,
+database extensions in `app/extensions.py`, entities in `app/models`, reusable
+logic in `app/services`/`app/utils`, and controllers in route blueprints. The
+legacy URLs and server-rendered frontend are retained.
 
 
 ---

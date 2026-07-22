@@ -413,7 +413,7 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <h6 class="mb-0">{{ m.name }}</h6>
                                     {% if major != 'کامپیوتر' %}
-                                    <form method="POST" class="d-inline" onsubmit="return confirm('{{ t(\'admin.confirm_delete_user\') }}')">
+                                    <form method="POST" class="d-inline" onsubmit="return confirm('{{ t("admin.confirm_delete_user") }}')">
                                         <input type="hidden" name="action" value="delete_major">
                                         <input type="hidden" name="major_id" value="{{ m.key }}">
                                         <button type="submit" class="btn btn-danger btn-sm"><i class="bi bi-trash"></i>
