@@ -3,7 +3,15 @@
 
 ## Current System
 
-A Flask monolith application.
+_Updated 2026-07: the "Future System" layering below is implemented, not just
+planned. `app/routes/api.py` is a working REST API (JSON + Bearer auth) that
+sits alongside the server-rendered browser routes and shares the same
+services/models layer. The server-rendered frontend is still the only client
+in production use — no SPA or mobile app consumes the API yet._
+
+A Flask application with a factory pattern, blueprint-separated routes
+(web, admin, api), a service layer, and a normalized PostgreSQL schema
+managed by Alembic migrations.
 
 
 ## Future System
