@@ -1,12 +1,12 @@
 from datetime import date, timedelta
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import User, Course, Major, Task, StudySession
-from app.services.statistics import get_user_stats, all_courses_list, course_stats, majors_for_template
+from app.models import Course, Major
 from app.services.seed import seed_reference_data
-from sqlalchemy.exc import IntegrityError
+from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
 
 
 class TestUserModel:
@@ -48,7 +48,7 @@ class TestMajorModel:
     def test_major_courses_relationship(self, create_major, create_course):
         major = create_major()
         course1 = create_course(major=major)
-        course2 = create_course(major=major)
+        create_course(major=major)
         assert major.courses.count() == 2
         assert course1.major == major
 
@@ -174,8 +174,8 @@ class TestStatisticsService:
         with app.test_request_context():
             major1 = create_major(key="cs_major", name_fa="کامپیوتر", name_en="CS")
             major2 = create_major(key="math_major", name_fa="ریاضی", name_en="Math")
-            c1 = create_course(major=major1, key="algo", name_fa="الگوریتم", name_en="Algo")
-            c2 = create_course(major=major2, key="calc", name_fa="حسابان", name_en="Calc")
+            create_course(major=major1, key="algo", name_fa="الگوریتم", name_en="Algo")
+            create_course(major=major2, key="calc", name_fa="حسابان", name_en="Calc")
             courses = all_courses_list()
             assert len(courses) == 2
             keys = {c["key"] for c in courses}

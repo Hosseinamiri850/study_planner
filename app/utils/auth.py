@@ -3,8 +3,8 @@ from functools import wraps
 from flask import current_app, flash, g, redirect, request, session, url_for
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
-from app.models import User
 from app.extensions import db
+from app.models import User
 from app.utils.i18n import t
 
 

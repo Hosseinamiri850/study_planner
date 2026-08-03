@@ -14,11 +14,12 @@ Public instance (no key):
     https://translate.argosopentech.com
 """
 
+import logging
 import os
 import re
-import requests
-import logging
 import time
+
+import requests
 
 logger = logging.getLogger(__name__)
 

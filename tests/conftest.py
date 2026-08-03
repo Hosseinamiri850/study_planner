@@ -1,16 +1,17 @@
 import sys
 import uuid
+from datetime import date
 from pathlib import Path
-from datetime import date, timedelta
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
+from werkzeug.security import generate_password_hash
+
+import translator as translator_mod
 from app import create_app
 from app.extensions import db
-from app.models import User, Course, Major, Task, StudySession
-from werkzeug.security import generate_password_hash
-import translator as translator_mod
+from app.models import Course, Major, StudySession, Task, User
 
 
 @pytest.fixture(autouse=True)

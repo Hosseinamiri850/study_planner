@@ -5,11 +5,9 @@ switch, and view_user. CSRF is disabled in TestConfig so form POSTs succeed
 without a token.
 """
 
-import pytest
-from werkzeug.security import generate_password_hash
 
 from app.extensions import db
-from app.models import User, Task
+from app.models import Task, User
 
 
 class TestAuthViews:
@@ -200,7 +198,7 @@ class TestDashboard:
 
     def test_dashboard_rejects_other_users_task(self, client, create_user, create_task):
         owner = create_user(username="ownerA")
-        sneaker = create_user(username="sneakerB")
+        create_user(username="sneakerB")
         task = create_task(user=owner)
         with client.session_transaction() as sess:
             sess["username"] = "sneakerB"

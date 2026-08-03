@@ -133,10 +133,11 @@ No pagination on the admin user list, the dashboard "other users" leaderboard,
 or `/api/tasks`. Add it before the user count or task count grows past what
 fits on one page.
 
-### TASK-019 — CI pipeline
-No `.github/workflows` exist. Add one that runs `pytest` and a linter
-(ruff/flake8) on every PR — the repo's own PR-based workflow (2 open PRs at
-last check) has no automated gate today.
+### TASK-019 — CI pipeline — DONE
+`.github/workflows/ci.yml` runs `ruff check` + `pytest -q` on Python 3.13
+for pushes to master/production-hardening and PRs to master. ruff config
+lives in `pyproject.toml` (selects F/E/W/I/UP, ignores E501/E701/BLE001/DTZ
+to match house style). Dev deps in `requirements-dev.txt`.
 
 ## P2 — production hygiene
 

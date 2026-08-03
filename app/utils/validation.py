@@ -2,7 +2,6 @@
 
 import re
 
-
 USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9_]{3,80}$")
 VALID_PRIORITIES = {"low", "medium", "high"}
 

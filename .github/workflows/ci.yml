@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [master, production-hardening]
+  pull_request:
+    branches: [master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check app/ translator.py tests/
+
+      - name: Test (pytest)
+        run: pytest -q
+        env:
+          SECRET_KEY: ci-test-secret-not-real-do-not-use

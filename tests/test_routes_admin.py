@@ -5,11 +5,10 @@ course CRUD, and the delete_course task-preservation behavior. CSRF is
 disabled in TestConfig so form POSTs succeed without a token.
 """
 
-import pytest
 from werkzeug.security import check_password_hash
 
 from app.extensions import db
-from app.models import User, Major, Course, Task
+from app.models import Course, Major, Task, User
 
 
 def login_admin(client, create_user, username="superadmin"):
@@ -46,7 +45,7 @@ class TestAdminUserManagement:
         assert User.query.filter_by(username="victim").first() is None
 
     def test_admin_cannot_delete_admin(self, client, create_user):
-        primary = login_admin(client, create_user, username="adminone")
+        login_admin(client, create_user, username="adminone")
         create_user(username="admintwo", is_admin=True)
         client.post("/admin", data={"action": "delete_user", "username": "admintwo"})
         # admintwo must survive — admins are protected.
@@ -136,12 +135,12 @@ class TestCourseCrud:
         })
         assert Course.query.filter_by(key="new_course").first() is not None
 
-    def test_admin_deletes_course_preserves_tasks(self, client, create_user, create_major, create_task):
+    def test_admin_deletes_course_preserves_tasks(self, client, create_user, create_major):
         login_admin(client, create_user)
         admin = User.query.filter_by(is_admin=True).first()
-        course = create_course = create_major()  # placeholder; create real course below
         # Create a real course and a task attached to it.
-        course = Course(key="doomed_course", name_fa="dc", name_en="Doomed Course", major_id=course.id)
+        major = create_major()
+        course = Course(key="doomed_course", name_fa="dc", name_en="Doomed Course", major_id=major.id)
         db.session.add(course)
         db.session.commit()
         task = Task(user_id=admin.id, course_id=course.id, course_key=course.key,
