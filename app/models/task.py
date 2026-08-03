@@ -1,6 +1,13 @@
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 
 from app.extensions import db
+
+
+def _utcnow():
+    """Timezone-aware UTC timestamp, for use as a SQLAlchemy column default
+    or a manual assignment. Stored as a naive UTC value because none of the
+    DateTime columns carry tz info; the intent (UTC) is preserved here."""
+    return datetime.now(UTC)
 
 
 class Task(db.Model):
@@ -33,7 +40,7 @@ class Task(db.Model):
     def mark_complete(self):
         self.done = True
         self.status = "completed"
-        self.completed_at = datetime.utcnow()
+        self.completed_at = _utcnow()
 
     def mark_pending(self):
         self.done = False
@@ -47,6 +54,6 @@ class StudySession(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     task_id = db.Column(db.Integer, db.ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
     duration = db.Column(db.Integer, nullable=False)
-    started_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    started_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
     ended_at = db.Column(db.DateTime)
     task = db.relationship("Task", back_populates="study_sessions")
