@@ -128,10 +128,13 @@ system-wide loop (`Task.query.filter_by(done=True).all()` then scanning 30
 days in Python) is the worst offender. Replace with grouped SQL queries
 (`func.sum`, `group_by(func.date(...))`).
 
-### TASK-018 — Pagination
-No pagination on the admin user list, the dashboard "other users" leaderboard,
-or `/api/tasks`. Add it before the user count or task count grows past what
-fits on one page.
+### TASK-018 — Pagination — PARTIALLY DONE
+`/api/tasks` GET honors optional `?page` and `?per_page` (clamped to 100),
+returning `{tasks, page, per_page, total, pages}` when both are present and the
+legacy `{tasks}` shape otherwise. Browser surfaces (admin user list, dashboard
+leaderboard) still render all rows server-side — wiring pagination into the
+existing server-rendered templates needs a UI decision first; defer until the
+user count grows past one page in practice.
 
 ### TASK-019 — CI pipeline — DONE
 `.github/workflows/ci.yml` runs `ruff check` + `pytest -q` on Python 3.13

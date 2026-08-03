@@ -65,6 +65,32 @@ class TestTasksAPI:
         assert "tasks" in data
         assert len(data["tasks"]) == 0
 
+    def test_list_tasks_returns_all_without_params(self, auth_client, create_task):
+        client, user = auth_client
+        for _ in range(3):
+            create_task(user=user)
+        data = client.get("/api/tasks").get_json()
+        assert len(data["tasks"]) == 3
+        # Legacy shape: no pagination envelope.
+        assert "total" not in data
+
+    def test_list_tasks_paginates_with_params(self, auth_client, create_task):
+        client, user = auth_client
+        for _ in range(5):
+            create_task(user=user)
+        data = client.get("/api/tasks?page=1&per_page=2").get_json()
+        assert len(data["tasks"]) == 2
+        assert data["total"] == 5
+        assert data["pages"] == 3
+
+    def test_list_tasks_clamps_per_page_to_100(self, auth_client, create_task):
+        client, user = auth_client
+        for _ in range(2):
+            create_task(user=user)
+        data = client.get("/api/tasks?page=1&per_page=9999").get_json()
+        assert data["per_page"] == 100
+        assert len(data["tasks"]) == 2
+
     def test_create_task_success(self, auth_client, create_course):
         client, user = auth_client
         course = create_course(key="test_course_api", name_fa="تست API", name_en="Test API")

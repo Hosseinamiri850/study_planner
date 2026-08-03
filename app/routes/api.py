@@ -73,7 +73,17 @@ def login():
 @api_bp.route("/tasks", methods=["GET"])
 @api_auth_required
 def list_tasks():
-    tasks = Task.query.filter_by(user_id=g.api_user.id).order_by(Task.created_at.desc(), Task.id.desc()).all()
+    query = Task.query.filter_by(user_id=g.api_user.id).order_by(Task.created_at.desc(), Task.id.desc())
+    page = request.args.get("page", type=int)
+    per_page = request.args.get("per_page", type=int)
+    # Backward-compat: no params → return everything, as before.
+    if page and per_page:
+        page = max(page, 1)
+        per_page = max(min(per_page, 100), 1)
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        tasks = pagination.items
+        return jsonify({"tasks": [_task_payload(task) for task in tasks], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
+    tasks = query.all()
     return jsonify({"tasks": [_task_payload(task) for task in tasks]})
 
 
