@@ -8,6 +8,7 @@ from app.extensions import csrf, db, limiter, migrate
 from app.models import User
 from app.services.seed import seed_reference_data
 from app.utils.i18n import inject_i18n
+from app.utils.logging import configure_logging
 from app.utils.validation import valid_password, valid_username
 
 
@@ -18,6 +19,7 @@ def create_app(config_object=None):
     if not app.config.get("SECRET_KEY"):
         raise RuntimeError("SECRET_KEY must be set in the environment or .env file.")
 
+    configure_logging(app)
     db.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
