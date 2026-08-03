@@ -28,7 +28,7 @@ Visualization:
 - Chart.js
 
 Translation:
-- LibreTranslate (self-hosted or public instance), integrated via `translator.py`
+- LibreTranslate (self-hosted or public instance), integrated via `app/integrations/translator.py`
 
 ---
 
@@ -66,10 +66,10 @@ migrations/
     20260723_01_initial_schema.py       Legacy table shapes.
     20260723_02_task_study_sessions.py  Task.status/estimated_hours/course_id,
                                          StudySession table, completion metadata.
-translator.py      LibreTranslate client. Still at repo root, not under app/ —
-                   see TODO TASK-023.
-tests/             pytest suite, 94 tests: models, services, utils, api routes.
-                   No tests yet for web.py / admin.py (the actual browser UI).
+  integrations/
+    translator.py                      LibreTranslate client (move from repo root — TASK-023 DONE).
+tests/             pytest suite, 154 tests: models, services, utils, integrations,
+                   api/web/admin routes, CLI commands, and rate limiting.
 ```
 
 Design principles (still the goal, mostly achieved):

@@ -308,7 +308,7 @@ pip install libretranslate
 libretranslate --host 0.0.0.0 --port 5001
 ```
 
-یا اگه نمی‌خوای self-hosted باشه، از public instance استفاده کن — فایل `translator.py` رو باز کن و این خط رو عوض کن:
+یا اگه نمی‌خوای self-hosted باشه، از public instance استفاده کن — فایل `app/integrations/translator.py` رو باز کن و این خط رو عوض کن:
 
 ```python
 LIBRETRANSLATE_URL = "https://translate.argosopentech.com"
@@ -445,7 +445,7 @@ with pre-migration data. |
 ```
 study_planner/
 ├── app.py              ← بک‌اند اصلی (روت‌ها، مدل‌ها، seed)
-├── translator.py       ← ماژول ترجمه LibreTranslate
+├── app/integrations/translator.py  ← ماژول ترجمه LibreTranslate
 ├── requirements.txt
 ├── .gitignore
 ├── README.md
@@ -474,7 +474,7 @@ study_planner/
 ```
 study_planner/
 ├── app.py              ← Main app (routes, models, seed)
-├── translator.py       ← LibreTranslate integration
+├── app/integrations/translator.py  ← LibreTranslate integration
 ├── requirements.txt
 ├── .gitignore
 ├── README.md

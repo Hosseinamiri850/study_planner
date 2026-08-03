@@ -159,10 +159,10 @@ a v1, but there's no way to force-logout a compromised session or invalidate
 tokens on password change. Needs a token-blacklist or a move to short-lived
 tokens + refresh tokens before the API has real external clients.
 
-### TASK-023 — `translator.py` location
-Move `translator.py` under `app/` (e.g. `app/integrations/translator.py`) for
-consistency with the rest of the P0 refactor, and add test coverage — it
-currently has none.
+### TASK-023 — `translator.py` location — DONE
+Moved to `app/integrations/translator.py`. All importers updated
+(api.py, utils/i18n.py, tests). .dockerignore updated. STRUCTURE.md,
+CLI docs, and README references point to the new path.
 
 ### TASK-024 — Backups
 No documented backup strategy for the PostgreSQL database. Needs one before
