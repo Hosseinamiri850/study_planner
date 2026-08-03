@@ -17,3 +17,7 @@ class Config:
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    # Rate-limit storage URI: Redis when set, in-memory otherwise.
+    RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    # Auth endpoints are brute-force targets — allow 5 attempts per minute.
+    RATELIMIT_AUTH = "5 per minute"

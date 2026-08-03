@@ -235,9 +235,13 @@ cp .env.example .env
 ```bash
 SECRET_KEY=یک-رشته-طولانی-تصادفی-و-مخفی
 DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
+# اختیاری برای production: ذخیره‌سازی rate-limit در Redis
+RATELIMIT_STORAGE_URI=redis://localhost:6379/1
 ```
 
 > `SECRET_KEY` الزامی است؛ برنامه بدون آن راه‌اندازی نمی‌شود.
+> rate-limit پیش‌فرض در حافظه ذخیره می‌شود؛ برای production مقدار `RATELIMIT_STORAGE_URI`
+> را به Redis تنظیم کن.
 
 ---
 
@@ -338,8 +342,13 @@ cp .env.example .env
 ```bash
 SECRET_KEY=a-long-random-secret-string
 DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+# optional, production: Redis-backed rate-limit storage
+RATELIMIT_STORAGE_URI=redis://localhost:6379/1
 ```
-`SECRET_KEY` is required; the app refuses to start without it.
+`SECRET_KEY` is required; the app refuses to start without it. Auth endpoints
+(`/login`, `/register`, `/api/auth/*`) are rate-limited to 5 requests/minute
+per IP; in production point `RATELIMIT_STORAGE_URI` at Redis so limits survive
+restarts and are shared across workers.
 
 ### Step 4 — Migrate, seed, and create an admin
 ```bash

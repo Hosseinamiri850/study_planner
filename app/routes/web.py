@@ -3,7 +3,8 @@ from datetime import date
 from flask import Blueprint, flash, jsonify, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import db
+from app.config import Config
+from app.extensions import db, limiter
 from app.models import Course, Major, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
 from app.utils.auth import current_user, login_required
@@ -30,6 +31,7 @@ def set_lang(lang):
 
 
 @web_bp.route("/login", methods=["GET", "POST"])
+@limiter.limit(Config.RATELIMIT_AUTH, methods=["POST"])
 def login():
     if request.method == "POST":
         user = User.query.filter_by(username=request.form.get("username", "").strip()).first()
@@ -41,6 +43,7 @@ def login():
 
 
 @web_bp.route("/register", methods=["GET", "POST"])
+@limiter.limit(Config.RATELIMIT_AUTH, methods=["POST"])
 def register():
     if request.method == "POST":
         username, password, fullname = (request.form.get(field, "").strip() for field in ("username", "password", "fullname"))

@@ -18,6 +18,7 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
+    RATELIMIT_ENABLED = False
 
 
 @pytest.fixture
