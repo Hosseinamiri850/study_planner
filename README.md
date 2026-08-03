@@ -274,6 +274,22 @@ python app.py
 ```
 
 مرورگر رو باز کن و برو به:
+
+---
+
+### روش جایگزین — اجرا با Docker
+
+نیازی به نصب دستی PostgreSQL نیست؛ PostgreSQL و Redis و برنامه رو با هم بالا بیار:
+```bash
+docker compose up --build
+```
+ایمیج هنگام بوت migration‌ها را اجرا می‌کند، سپس gunicorn روی پورت ۵۰۰۰ سرو می‌دهد.
+ساختن ادمین داخل کانتینر در حال اجرا:
+```bash
+docker compose exec app flask --app app create-admin <username>
+```
+
+مرورگر رو باز کن و برو به:
 ```
 http://localhost:5000
 ```
@@ -364,6 +380,18 @@ Create an admin explicitly via the `create-admin` command above.
 python app.py
 ```
 Open → [http://localhost:5000](http://localhost:5000)
+
+### Alternative — one-shot with Docker
+
+Skip manual PostgreSQL setup; bring up Postgres + Redis + app together:
+```bash
+docker compose up --build
+```
+The image runs migrations on boot, then serves gunicorn on port 5000.
+Create an admin inside the running container:
+```bash
+docker compose exec app flask --app app create-admin <username>
+```
 
 ### Step 5 (Optional) — Auto-translate
 ```bash

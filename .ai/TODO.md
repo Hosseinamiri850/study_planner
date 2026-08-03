@@ -141,10 +141,12 @@ to match house style). Dev deps in `requirements-dev.txt`.
 
 ## P2 — production hygiene
 
-### TASK-020 — Docker (see TASK-008, same item, re-prioritized)
-Dockerfile + docker-compose (app + Postgres) so local dev and prod match, and
-new-contributor setup doesn't depend on manually installing/configuring
-PostgreSQL.
+### TASK-020 — Docker — DONE
+`Dockerfile` (python:3.13-slim, runs `flask db upgrade` then gunicorn on the
+app factory) and `docker-compose.yml` (app + PostgreSQL 16 + Redis, so
+RATELIMIT_STORAGE_URI can use Redis out of the box). `.dockerignore` keeps
+`.env`, caches, and `.git` out of the image. See README for `docker compose
+up` usage.
 
 ### TASK-021 — Structured logging + error monitoring
 Currently only `logging.warning`/`.error` calls in `translator.py`. Add
