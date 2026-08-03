@@ -24,7 +24,7 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Lint (ruff)
-        run: ruff check app/ translator.py tests/
+        run: ruff check app/ tests/
 
       - name: Test (pytest)
         run: pytest -q
