@@ -1,6 +1,5 @@
 """Tests for Flask CLI commands (create-admin, seed-reference-data)."""
 
-import pytest
 
 from app.models import User
 

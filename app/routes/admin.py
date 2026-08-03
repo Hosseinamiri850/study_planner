@@ -11,7 +11,6 @@ from app.services.statistics import majors_for_template
 from app.utils.auth import admin_required
 from app.utils.validation import valid_password
 
-
 admin_bp = Blueprint("admin", __name__)
 
 

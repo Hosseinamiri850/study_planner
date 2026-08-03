@@ -1,9 +1,6 @@
 from datetime import date, timedelta
 
-import pytest
-
-from app.services.statistics import get_user_stats, all_courses_list, course_stats, majors_for_template
-from app.services.seed import seed_reference_data
+from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
 
 
 class TestGetUserStats:
@@ -83,7 +80,7 @@ class TestCourseStats:
     def test_empty_stats(self, app, create_course, create_major):
         with app.test_request_context():
             major = create_major()
-            course = create_course(major=major, key="empty")
+            create_course(major=major, key="empty")
             courses = [{"key": "empty", "name": "Empty"}]
             tasks = []
             stats = course_stats(tasks, courses)

@@ -5,9 +5,10 @@ TestConfig disables so the rest of the suite isn't throttled.
 """
 
 import pytest
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
-from werkzeug.security import generate_password_hash
 from app.models import User
 
 

@@ -3,7 +3,6 @@
 from app.extensions import db
 from app.models import Course, Major
 
-
 DEFAULT_DATA = {
     "majors": [{"key": "computer_science", "name_fa": "مهندسی کامپیوتر", "name_en": "Computer Science", "courses": [
         {"key": "data_structures", "name_fa": "ساختمان داده", "name_en": "Data Structures"},

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from flask import session
 
-
 SUPPORTED_LANGS = ("fa", "en")
 DEFAULT_LANG = "fa"
 _locale_cache = {}

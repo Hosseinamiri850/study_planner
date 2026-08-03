@@ -11,7 +11,6 @@ from app.utils.auth import current_user, login_required
 from app.utils.i18n import SUPPORTED_LANGS, t
 from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
 
-
 web_bp = Blueprint("web", __name__)
 
 

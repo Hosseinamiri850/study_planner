@@ -1,8 +1,7 @@
-from datetime import date
 
 import pytest
 
-from app.utils.validation import valid_username, valid_password, valid_priority, positive_hours
+from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
 
 
 class TestValidation:
@@ -177,12 +176,12 @@ class TestAuth:
 
     def test_admin_required_redirects_non_admin(self, app, create_user, client):
         from app.utils.auth import admin_required
-        user = create_user(username="regular", is_admin=False)
+        create_user(username="regular", is_admin=False)
         @admin_required
         def protected():
             return "ok"
         with app.test_request_context():
-            from flask import session, flash
+            from flask import session
             session["username"] = "regular"
             response = protected()
             assert response.status_code == 302
