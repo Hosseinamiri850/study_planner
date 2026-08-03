@@ -98,7 +98,7 @@ the mobile API's mutating endpoints accept bearer tokens only.
 - 🏆 مقایسه ساعت مطالعه با همکلاسی‌ها
 
 ### امنیت و احراز هویت
-- 🔐 رمز عبور با bcrypt هش می‌شود (ذخیره ایمن)
+- 🔐 رمز عبور هش می‌شود (ذخیره ایمن با Werkzeug)
 - 🛡️ محافظت از روت‌ها با decorator های login_required و admin_required
 - 👮 پنل ادمین جداگانه با دسترسی محدود
 
@@ -128,12 +128,12 @@ the mobile API's mutating endpoints accept bearer tokens only.
 - ⏱️ Study hour tracking with daily, weekly, and monthly breakdowns
 - 📊 Interactive charts (weekly bar + monthly line) powered by Chart.js
 - 👥 Social view — see other users' progress and study hours
-- 🔐 Secure hashed passwords (Werkzeug / bcrypt)
+- 🔐 Secure hashed passwords (Werkzeug)
 - 🌙 Dark / Light theme toggle, saved per user
 - 🌐 Full **Persian ↔ English** i18n with RTL/LTR layout switching
 - 🤖 Auto-translate major/course names via LibreTranslate
 - 🛡️ Admin panel — user management, majors, courses, system stats
-- 🗄️ PostgreSQL + SQLAlchemy ORM (auto-seeded on first run)
+- 🗄️ PostgreSQL + SQLAlchemy ORM, schema managed by Alembic migrations
 
 ---
 
@@ -222,29 +222,44 @@ createdb study_planner
 
 ---
 
-### مرحله ۴ — تنظیم اتصال دیتابیس
+### مرحله ۳ — تنظیم اتصال دیتابیس
 
-فایل `app.py` رو باز کن و این خط رو پیدا کن:
-
-```python
-"postgresql+psycopg://postgres:postgres@localhost:5432/study_planner"
-```
-
-`postgres` دوم رو با رمز عبور PostgreSQL خودت عوض کن:
-
-```python
-"postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
-```
-
-یا با متغیر محیطی (روش بهتر):
+فایل `.env.example` رو به `.env` کپی کن و مقادیر خودت رو وارد کن:
 
 ```bash
-# ویندوز:
-set DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
-
-# لینوکس/مک:
-export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+cp .env.example .env
 ```
+
+حداقل این متغیرها رو تنظیم کن (`.env` هرگز commit نشه):
+
+```bash
+SECRET_KEY=یک-رشته-طولانی-تصادفی-و-مخفی
+DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
+```
+
+> `SECRET_KEY` الزامی است؛ برنامه بدون آن راه‌اندازی نمی‌شود.
+
+---
+
+### مرحله ۴ — اجرای migration و seed
+
+برخلاف نسخه‌های قدیمی، برنامه دیگر جداول را به‌صورت خودکار **نمی‌سازد** و اکانت ادمین
+پیش‌فرض **ایجاد نمی‌کند**. مراحل زیر را به‌ترتیب اجرا کن:
+
+```bash
+flask --app app db upgrade        # ساختن/به‌روزرسانی جداول از طریق Alembic
+flask --app app seed-reference-data  # اختیاری: رشته و ۱۳ درس پیش‌فرض کامپیوتر
+```
+
+سپس یک ادمین بساز (برای ورود به پنل مدیریت):
+
+```bash
+flask --app app create-admin <username>
+# از شما رمز عبور می‌خواهد (نمایش داده نمی‌شود) و آن را هش‌شده ذخیره می‌کند
+```
+
+> برنامه به‌صورت عمدی هیچ اکانت `admin/admin` پیش‌فرض نمی‌سازد. ادمین فقط از طریق
+> دستور `create-admin` ساخته می‌شود.
 
 ---
 
@@ -254,17 +269,10 @@ export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/
 python app.py
 ```
 
-در اولین اجرا، برنامه به صورت **خودکار**:
-- ✅ همه جداول دیتابیس رو می‌سازه
-- ✅ اکانت ادمین پیش‌فرض می‌سازه (`admin` / `admin`)
-- ✅ رشته مهندسی کامپیوتر با ۱۳ درس پیش‌فرض وارد می‌کنه
-
-بعد مرورگر رو باز کن و برو به:
+مرورگر رو باز کن و برو به:
 ```
 http://localhost:5000
 ```
-
-> ⚠️ **مهم:** فوری بعد از اولین لاگین، رمز ادمین رو از پنل مدیریت تغییر بده!
 
 ---
 
@@ -296,6 +304,10 @@ LIBRETRANSLATE_URL = "https://translate.argosopentech.com"
 gunicorn -w 4 -b 0.0.0.0:8000 app:app
 ```
 
+> در محیط production حتماً یک `SECRET_KEY` قوی و `DATABASE_URL` مناسب را از طریق
+> متغیرهای محیطی تنظیم کن و migration‌ها را قبل از اجرا اعمال کن
+> (`flask --app app db upgrade`).
+
 </div>
 
 ## 🚀 Quick Start (English)
@@ -319,17 +331,29 @@ CREATE DATABASE study_planner;
 ```
 
 ### Step 3 — Configure
-Edit `app.py` or set environment variable:
+Copy `.env.example` to `.env` and set your own values:
 ```bash
-export DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+cp .env.example .env
 ```
+```bash
+SECRET_KEY=a-long-random-secret-string
+DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
+```
+`SECRET_KEY` is required; the app refuses to start without it.
 
-### Step 4 — Run
+### Step 4 — Migrate, seed, and create an admin
+```bash
+flask --app app db upgrade            # create/update tables via Alembic
+flask --app app seed-reference-data   # optional: bundled CS majors & courses
+flask --app app create-admin <username>   # prompts for a password, hashes it
+```
+The app no longer auto-creates tables or seeds any default `admin/admin` account.
+Create an admin explicitly via the `create-admin` command above.
+
+### Step 5 — Run
 ```bash
 python app.py
 ```
-App auto-creates tables, seeds admin (`admin`/`admin`), and seeds default CS courses.
-
 Open → [http://localhost:5000](http://localhost:5000)
 
 ### Step 5 (Optional) — Auto-translate
@@ -345,25 +369,35 @@ libretranslate --host 0.0.0.0 --port 5001
 ## 🗃️ ساختار دیتابیس
 
 ```
-users    — id, username, password (hashed), fullname, is_admin, theme, created_at
-majors   — id, key (slug), name_fa, name_en
-courses  — id, key (slug), name_fa, name_en, major_id
-tasks    — id, user_id, course_key, description, done, priority, hours, created_at
+users           — id, username, password (hashed), fullname, is_admin, theme, created_at
+majors          — id, key (slug), name_fa, name_en
+courses         — id, key (slug), name_fa, name_en, major_id
+tasks           — id, user_id, course_id, course_key, title, description, priority,
+                  status, hours, estimated_hours, done, created_at, completed_at
+study_sessions  — id, task_id, duration, started_at, ended_at
 ```
 
 رشته‌ها و دروس با **هر دو نام فارسی و انگلیسی** ذخیره می‌شن.
 تسک‌ها `course_key` (یه slug زبان‌خنثی) ذخیره می‌کنن تا در هر زبانی درست نمایش داده بشن.
+ستون‌های قدیمی (`course_key`, `hours`, `done`) در کنار ستون‌های نرمال‌سازی‌شده
+(`course_id`, `estimated_hours`, `status`) برای سازگاری با داده‌های قدیمی حفظ شده‌اند.
 
 </div>
 
 ## 🗃️ Database Schema
 
 ```
-users    — id, username, password (hashed), fullname, is_admin, theme, created_at
-majors   — id, key (slug), name_fa, name_en
-courses  — id, key (slug), name_fa, name_en, major_id
-tasks    — id, user_id, course_key, description, done, priority, hours, created_at
+users           — id, username, password (hashed), fullname, is_admin, theme, created_at
+majors          — id, key (slug), name_fa, name_en
+courses         — id, key (slug), name_fa, name_en, major_id
+tasks           — id, user_id, course_id, course_key, title, description, priority,
+                  status, hours, estimated_hours, done, created_at, completed_at
+study_sessions  — id, task_id, duration, started_at, ended_at
 ```
+
+Legacy columns (`course_key`, `hours`, `done`) are retained alongside the
+normalized ones (`course_id`, `estimated_hours`, `status`) for compatibility
+with pre-migration data. |
 
 ---
 
@@ -423,25 +457,30 @@ study_planner/
 
 <div dir="rtl">
 
-## 👤 اکانت ادمین پیش‌فرض
+## 👤 ساخت ادمین
 
-| فیلد        | مقدار   |
-|-------------|---------|
-| نام کاربری  | `admin` |
-| رمز عبور   | `admin` |
+برنامه به‌صورت عمدی هیچ اکانت ادمین پیش‌فرضی نمی‌سازد. برای دسترسی به پنل مدیریت،
+یک ادمین از طریق دستور زیر بساز:
 
-> ⚠️ بلافاصله بعد از اولین لاگین رمز رو از طریق پنل مدیریت تغییر بده.
+```bash
+flask --app app create-admin <username>
+```
+
+> این دستور رمز عبور را درخواست می‌کند (نمایش داده نمی‌شود)، آن را هش کرده و
+> کاربر را با نقش ادمین ثبت می‌کند.
 
 </div>
 
-## 👤 Default Admin Credentials
+## 👤 Creating an Admin
 
-| Field    | Value   |
-|----------|---------|
-| Username | `admin` |
-| Password | `admin` |
+The app deliberately creates **no default admin account**. Create one explicitly
+via the CLI command before accessing the admin panel:
 
-> ⚠️ Change the admin password immediately after first login via the Admin Panel.
+```bash
+flask --app app create-admin <username>
+```
+
+> Prompts for a password (hidden), hashes it, and creates the user with admin role.
 
 ---
 

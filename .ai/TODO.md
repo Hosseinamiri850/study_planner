@@ -51,7 +51,7 @@ dashboard statistics, translate. Tested in `tests/test_routes_api.py`.
 # P2 — Medium (originally planned)
 
 ## TASK-007 — Testing — PARTIALLY DONE
-72 pytest tests covering models, services, utils, API routes. Zero coverage
+94 pytest tests covering models, services, utils, API routes. Zero coverage
 of `web.py`/`admin.py` — the actual browser UI. See new TASK-015.
 
 ## TASK-008 — Docker Support — NOT STARTED

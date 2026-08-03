@@ -1,49 +1,51 @@
 """
-translator.py — ماژول ترجمه با LibreTranslate
+translator.py — LibreTranslate translation module.
 
-LibreTranslate یه سرویس ترجمه رایگان و open-source هست.
-می‌تونه self-hosted باشه یا از public instance استفاده کنی.
+LibreTranslate is a free, open-source translation service.
+It can be self-hosted, or a public instance can be used.
 
-نصب (self-hosted):
+Self-hosted install:
     pip install libretranslate
     libretranslate --host 0.0.0.0 --port 5001
 
-یا استفاده از public instance رایگان:
-    https://libretranslate.com  (نیاز به API key رایگان داره)
-    https://translate.argosopentech.com (بدون key)
+Public instance (free, requires an API key):
+    https://libretranslate.com
+Public instance (no key):
+    https://translate.argosopentech.com
 """
 
 import os
 import re
 import requests
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
-# ─── تنظیمات ────────────────────────────────────────────────────────────────
+# ─── Settings ────────────────────────────────────────────────────────────────
 
-# اگه self-hosted داری: "http://localhost:5001"
-# اگه از public instance استفاده می‌کنی: "https://translate.argosopentech.com"
+# Self-hosted: "http://localhost:5001"
+# Public instance: "https://translate.argosopentech.com"
 LIBRETRANSLATE_URL = os.environ.get(
     "LIBRETRANSLATE_URL",
     "http://localhost:5001"
 )
 
-# برای اکثر public instance‌ها خالی بذار، برای libretranslate.com api key لازمه
+# Leave empty for most public instances; libretranslate.com needs an API key.
 LIBRETRANSLATE_API_KEY = os.environ.get("LIBRETRANSLATE_API_KEY", "")
 
-# timeout برای request (ثانیه)
+# Request timeout (seconds).
 REQUEST_TIMEOUT = 5
 
 
-# ─── تشخیص زبان ────────────────────────────────────────────────────────────
+# ─── Language detection ────────────────────────────────────────────────────
 
 def detect_language(text: str) -> str:
     """
-    تشخیص اینکه متن فارسی هست یا انگلیسی.
-    از Unicode range استفاده می‌کنه — بدون نیاز به API.
+    Detect whether text is Persian or English.
+    Uses Unicode ranges — no API call needed.
     """
-    persian_chars = len(re.findall(r'[\u0600-\u06FF]', text))
+    persian_chars = len(re.findall(r'[؀-ۿ]', text))
     latin_chars   = len(re.findall(r'[a-zA-Z]',        text))
 
     if persian_chars > latin_chars:
@@ -51,28 +53,28 @@ def detect_language(text: str) -> str:
     elif latin_chars > persian_chars:
         return "en"
     else:
-        # اگه مساوی بود، بر اساس اولین کاراکتر معنادار تصمیم بگیر
+        # On a tie, decide by the first meaningful character.
         for ch in text:
-            if '\u0600' <= ch <= '\u06FF':
+            if '؀' <= ch <= 'ۿ':
                 return "fa"
             if ch.isalpha():
                 return "en"
         return "en"
 
 
-# ─── ترجمه ──────────────────────────────────────────────────────────────────
+# ─── Translation ──────────────────────────────────────────────────────────
 
 def translate(text: str, source: str, target: str) -> str | None:
     """
-    ترجمه متن با LibreTranslate.
-    
+    Translate text via LibreTranslate.
+
     Args:
-        text:   متن ورودی
-        source: زبان مبدأ ('fa' یا 'en')
-        target: زبان مقصد ('fa' یا 'en')
-    
+        text:   input text
+        source: source language ('fa' or 'en')
+        target: target language ('fa' or 'en')
+
     Returns:
-        متن ترجمه شده، یا None در صورت خطا
+        Translated text, or None on error.
     """
     if not text or not text.strip():
         return ""
@@ -80,7 +82,7 @@ def translate(text: str, source: str, target: str) -> str | None:
     if source == target:
         return text
 
-    # LibreTranslate از کد "fa" برای فارسی استفاده می‌کنه
+    # LibreTranslate uses "fa" for Persian.
     payload = {
         "q":      text.strip(),
         "source": source,
@@ -100,23 +102,23 @@ def translate(text: str, source: str, target: str) -> str | None:
         return resp.json().get("translatedText", "").strip()
 
     except requests.exceptions.ConnectionError:
-        logger.warning("LibreTranslate در دسترس نیست: %s", LIBRETRANSLATE_URL)
+        logger.warning("LibreTranslate unavailable: %s", LIBRETRANSLATE_URL)
         return None
     except requests.exceptions.Timeout:
         logger.warning("LibreTranslate timeout")
         return None
     except Exception as e:
-        logger.error("خطای ترجمه: %s", e)
+        logger.error("Translation error: %s", e)
         return None
 
 
 def auto_translate(text: str) -> dict:
     """
-    تشخیص خودکار زبان و ترجمه به زبان دیگه.
-    
+    Auto-detect language and translate to the other one.
+
     Args:
-        text: متن ورودی (فارسی یا انگلیسی)
-    
+        text: input text (Persian or English)
+
     Returns:
         {'fa': '...', 'en': '...', 'detected': 'fa'/'en', 'success': bool}
     """
@@ -133,7 +135,7 @@ def auto_translate(text: str) -> dict:
             "success":  True,
         }
     else:
-        # اگه ترجمه شکست خورد، هر دو فیلد رو با همون متن پر کن
+        # On failure, fill both fields with the original text.
         return {
             "fa":       text,
             "en":       text,
@@ -143,7 +145,7 @@ def auto_translate(text: str) -> dict:
 
 
 def is_available() -> bool:
-    """بررسی اینکه LibreTranslate در دسترسه یا نه"""
+    """Check whether LibreTranslate is reachable."""
     try:
         resp = requests.get(
             f"{LIBRETRANSLATE_URL}/languages",
@@ -152,3 +154,34 @@ def is_available() -> bool:
         return resp.status_code == 200
     except Exception:
         return False
+
+
+# ─── Availability cache ────────────────────────────────────────────────────
+# `is_available()` makes a blocking HTTP request; invoking it from the context
+# processor (which runs on every request) means every page load pays up to
+# 2s of latency. This TTL-based cache holds the value so the network is hit
+# only once per TTL window.
+_AVAILABILITY_TTL = 60  # seconds
+_availability_cache = {"value": None, "expires_at": 0.0}
+
+
+def is_available_cached() -> bool:
+    """TTL-cached version of `is_available()`.
+
+    Suitable for the `inject_i18n` context processor, so per-render blocking
+    network calls are avoided. The `/api/translator-status` route still uses
+    `is_available()` directly for a live answer.
+    """
+    now = time.monotonic()
+    if _availability_cache["value"] is not None and now < _availability_cache["expires_at"]:
+        return _availability_cache["value"]
+    value = is_available()
+    _availability_cache["value"] = value
+    _availability_cache["expires_at"] = now + _AVAILABILITY_TTL
+    return value
+
+
+def reset_availability_cache() -> None:
+    """Clear the cache — for tests."""
+    _availability_cache["value"] = None
+    _availability_cache["expires_at"] = 0.0

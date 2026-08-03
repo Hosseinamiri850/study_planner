@@ -32,8 +32,9 @@ app/
 migrations/       Alembic. Two revisions so far: 20260723_01 (initial), 20260723_02
                    (Task.status/estimated_hours/course_id + StudySession table).
 translator.py     LibreTranslate integration. Lives at repo root, NOT under app/ —
-                   this is a known inconsistency, see .ai/TODO.md TASK-011.
+                   this is a known inconsistency, see .ai/TODO.md TASK-023.
 tests/            pytest, in-memory SQLite. Good fixture coverage in conftest.py.
+                   94 tests covering models/, services/, utils/, and api.py.
 ```
 
 Two parallel auth systems exist by design and must both keep working:
@@ -48,6 +49,10 @@ Two parallel auth systems exist by design and must both keep working:
 
 ## Working conventions
 
+- **Comments must be in English.** No Persian/Farsi comments in code. Existing
+  Persian comments should be translated to English when touched. User-facing
+  strings still go through i18n (`locales/{fa,en}.json`); this rule is about
+  code/docstring comments only.
 - Prefer small, incremental changes over rewrites. This codebase is intentionally
   compact (~950 lines of Python) and terse — match the existing style rather than
   expanding it into a framework-heavy shape.
@@ -67,7 +72,7 @@ Two parallel auth systems exist by design and must both keep working:
   and the API drift into different feature sets without a reason.
 - i18n: user-facing strings go in `locales/fa.json` / `locales/en.json` via `t("key.path")`,
   never hardcoded in templates or Python. Keep both files' keys in sync.
-- Run `pytest` before considering any change done. Current suite: 72 tests, all
+- Run `pytest` before considering any change done. Current suite: 94 tests, all
   passing, but it only covers `models/`, `services/`, `utils/`, and `api.py` —
   **`web.py` and `admin.py` (the actual browser UI, i.e. 100% of real users today)
   have zero test coverage.** Adding tests there is high-value, low-risk work.
