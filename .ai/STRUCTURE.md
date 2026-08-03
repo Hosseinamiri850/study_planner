@@ -67,8 +67,8 @@ migrations/
     20260723_02_task_study_sessions.py  Task.status/estimated_hours/course_id,
                                          StudySession table, completion metadata.
 translator.py      LibreTranslate client. Still at repo root, not under app/ —
-                   see TODO TASK-011.
-tests/             pytest suite, 72 tests: models, services, utils, api routes.
+                   see TODO TASK-023.
+tests/             pytest suite, 94 tests: models, services, utils, api routes.
                    No tests yet for web.py / admin.py (the actual browser UI).
 ```
 

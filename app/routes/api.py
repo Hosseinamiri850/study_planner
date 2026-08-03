@@ -157,7 +157,7 @@ def dashboard_statistics():
 def translate():
     text = (request.get_json(silent=True) or {}).get("text", "").strip()
     if not text:
-        return jsonify({"error": "متن خالی است"}), 400
+        return jsonify({"error": "Text must not be empty."}), 400
     return jsonify(auto_translate(text))
 
 

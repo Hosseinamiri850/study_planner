@@ -31,7 +31,7 @@ def t(key, **kwargs):
 
 
 def inject_i18n():
-    from translator import is_available as translator_available
+    from translator import is_available_cached as translator_available
 
     locale = load_locale(get_lang())
     return {"t": t, "lang": get_lang(), "dir": locale.get("dir", "rtl"), "supported_langs": SUPPORTED_LANGS, "translator_available": translator_available()}
