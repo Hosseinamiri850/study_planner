@@ -10,6 +10,19 @@ from app import create_app
 from app.extensions import db
 from app.models import User, Course, Major, Task, StudySession
 from werkzeug.security import generate_password_hash
+import translator as translator_mod
+
+
+@pytest.fixture(autouse=True)
+def _stub_translator_availability():
+    """The i18n context processor calls translator.is_available_cached() on
+    every render. Stub the network check so tests never hit LibreTranslate,
+    and reset the TTL cache so the stub is picked up fresh each test.
+    """
+    translator_mod.is_available = lambda: False
+    translator_mod.reset_availability_cache()
+    yield
+    translator_mod.reset_availability_cache()
 
 
 class TestConfig:
@@ -18,6 +31,7 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
+    WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
 
 

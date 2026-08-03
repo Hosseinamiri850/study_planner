@@ -1,5 +1,6 @@
 """Read-model helpers for dashboard and administration statistics."""
 
+from collections import defaultdict
 from datetime import date, timedelta
 
 from app.models import Course, Major
@@ -9,18 +10,22 @@ def get_user_stats(user):
     today = date.today()
     tasks = user.tasks.all()
     completed = [task for task in tasks if task.done]
-    hours_for = lambda day: sum(task.hours for task in completed if task.created_at == day)
-    week_hours = {str(today - timedelta(days=offset)): hours_for(today - timedelta(days=offset)) for offset in range(7)}
+    # Single pass: sum done hours by completed-day. O(tasks), not O(days × tasks).
+    hours_by_day = defaultdict(float)
+    for task in completed:
+        if task.created_at is not None:
+            hours_by_day[task.created_at] += task.hours or 0
+    week_hours = {str(today - timedelta(days=offset)): hours_by_day[today - timedelta(days=offset)] for offset in range(7)}
     month_hours = {
-        str(today - timedelta(days=offset)): hours_for(today - timedelta(days=offset))
-        for offset in range(30)
-        if hours_for(today - timedelta(days=offset)) > 0
+        str(day): hours
+        for day, hours in ((today - timedelta(days=offset), hours_by_day[today - timedelta(days=offset)]) for offset in range(30))
+        if hours > 0
     }
     return {
         "tasks": tasks,
         "total_tasks": len(tasks),
         "total_done": len(completed),
-        "today_hours": hours_for(today),
+        "today_hours": hours_by_day[today],
         "week_hours": week_hours,
         "total_week_hours": sum(week_hours.values()),
         "month_hours": month_hours,

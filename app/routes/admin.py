@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, timedelta
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -29,10 +30,15 @@ def admin_panel():
         completed = [task for task in tasks if task.done]
         users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": sum(task.hours for task in completed if task.created_at == today), "week_hours": sum(task.hours for task in completed if task.created_at >= week_start), "total_hours": sum(task.hours for task in completed), "created_at": str(user.created_at)})
     completed_tasks = Task.query.filter_by(done=True).all()
+    # Single pass over completed tasks: sum hours by completed-day.
+    hours_by_day = defaultdict(float)
+    for task in completed_tasks:
+        if task.created_at is not None:
+            hours_by_day[task.created_at] += task.hours or 0
     system_week_hours, system_month_hours = {}, {}
     for offset in range(30):
         day = today - timedelta(days=offset)
-        hours = sum(task.hours for task in completed_tasks if task.created_at == day)
+        hours = hours_by_day[day]
         if offset < 7: system_week_hours[str(day)] = hours
         if hours: system_month_hours[str(day)] = hours
     admin_user = User.query.filter_by(is_admin=True).first()
