@@ -5,7 +5,7 @@ from app.config import Config
 from app.extensions import csrf, db, limiter
 from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
-from app.models import Course, Task, User
+from app.models import Course, StudySession, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import api_auth_required, create_access_token, login_required
 from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
@@ -153,6 +153,65 @@ def delete_task(task_id):
     db.session.delete(task)
     db.session.commit()
     return "", 204
+
+
+def _session_payload(session):
+    return {
+        "id": session.id,
+        "task_id": session.task_id,
+        "started_at": session.started_at.isoformat() if session.started_at else None,
+        "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+        "duration": session.duration,
+        "is_open": session.is_open,
+    }
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions", methods=["POST"])
+@csrf.exempt
+@api_auth_required
+def start_session(task_id):
+    """Open a new study session for a task owned by the caller.
+
+    Returns 409 if there is already an open session for that task — clients
+    must stop the existing one before starting another.
+    """
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    if task.active_session is not None:
+        return _error("A session is already open for this task.", 409)
+    session = task.start_session()
+    db.session.commit()
+    return jsonify({"session": _session_payload(session)}), 201
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions/<int:session_id>/stop", methods=["POST"])
+@csrf.exempt
+@api_auth_required
+def stop_session(task_id, session_id):
+    """Close an open study session owned by the caller. Idempotent: stopping
+    an already-closed session returns 200 with the persisted duration.
+    """
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    session = db.session.get(StudySession, session_id)
+    if not session or session.task_id != task_id:
+        return _error("Session not found.", 404)
+    if session.is_open:
+        session.stop()
+        db.session.commit()
+    return jsonify({"session": _session_payload(session)})
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions", methods=["GET"])
+@api_auth_required
+def list_sessions(task_id):
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    sessions = task.study_sessions.order_by(StudySession.started_at.desc()).all()
+    return jsonify({"sessions": [_session_payload(s) for s in sessions]})
 
 
 @api_bp.route("/statistics/dashboard", methods=["GET"])
