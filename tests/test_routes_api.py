@@ -91,6 +91,26 @@ class TestTasksAPI:
         assert data["per_page"] == 100
         assert len(data["tasks"]) == 2
 
+    def test_list_tasks_rejects_page_without_per_page(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=1")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_per_page_without_page(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?per_page=10")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_page_below_one(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=0&per_page=10")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_per_page_below_one(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=1&per_page=0")
+        assert response.status_code == 400
+
     def test_create_task_success(self, auth_client, create_course):
         client, user = auth_client
         course = create_course(key="test_course_api", name_fa="تست API", name_en="Test API")

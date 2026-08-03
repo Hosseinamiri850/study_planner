@@ -76,15 +76,23 @@ def list_tasks():
     query = Task.query.filter_by(user_id=g.api_user.id).order_by(Task.created_at.desc(), Task.id.desc())
     page = request.args.get("page", type=int)
     per_page = request.args.get("per_page", type=int)
-    # Backward-compat: no params → return everything, as before.
-    if page and per_page:
-        page = max(page, 1)
-        per_page = max(min(per_page, 100), 1)
+    # If either pagination param is set, both must be set; otherwise fall back
+    # to the legacy "return everything" shape for backward compatibility.
+    has_page = request.args.get("page") is not None
+    has_per_page = request.args.get("per_page") is not None
+    if has_page != has_per_page:
+        return _error("page and per_page must be provided together.")
+    if has_page and has_per_page:
+        if page < 1:
+            return _error("page must be >= 1.")
+        if per_page < 1:
+            return _error("per_page must be >= 1.")
+        per_page = min(per_page, 100)
+        # Flask-SQLAlchemy paginate() emits LIMIT/OFFSET at the SQL layer,
+        # so we never materialise the whole rowset into memory.
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        tasks = pagination.items
-        return jsonify({"tasks": [_task_payload(task) for task in tasks], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
-    tasks = query.all()
-    return jsonify({"tasks": [_task_payload(task) for task in tasks]})
+        return jsonify({"tasks": [_task_payload(task) for task in pagination.items], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
+    return jsonify({"tasks": [_task_payload(task) for task in query.all()]})
 
 
 @api_bp.route("/tasks", methods=["POST"])

@@ -128,13 +128,12 @@ system-wide loop (`Task.query.filter_by(done=True).all()` then scanning 30
 days in Python) is the worst offender. Replace with grouped SQL queries
 (`func.sum`, `group_by(func.date(...))`).
 
-### TASK-018 — Pagination — PARTIALLY DONE
-`/api/tasks` GET honors optional `?page` and `?per_page` (clamped to 100),
-returning `{tasks, page, per_page, total, pages}` when both are present and the
-legacy `{tasks}` shape otherwise. Browser surfaces (admin user list, dashboard
-leaderboard) still render all rows server-side — wiring pagination into the
-existing server-rendered templates needs a UI decision first; defer until the
-user count grows past one page in practice.
+### TASK-018 — Pagination — BACKEND DONE (UI DEFERRED)
+`/api/tasks` GET honors `?page` and `?per_page` (both required together;
+per_page clamped to 1–100). Flask-SQLAlchemy `paginate()` emits LIMIT/OFFSET
+at the SQL layer — no full materialisation. Legacy `{tasks}` shape preserved
+when neither param is present. Browser UI pagination (admin user list,
+dashboard leaderboard) deferred — needs a UI decision.
 
 ### TASK-019 — CI pipeline — DONE
 `.github/workflows/ci.yml` runs `ruff check` + `pytest -q` on Python 3.13
@@ -151,10 +150,12 @@ RATELIMIT_STORAGE_URI can use Redis out of the box). `.dockerignore` keeps
 `.env`, caches, and `.git` out of the image. See README for `docker compose
 up` usage.
 
-### TASK-021 — Structured logging + error monitoring
-Currently only `logging.warning`/`.error` calls in `translator.py`. Add
-request-scoped structured logging and an error tracker (e.g. Sentry) so
-production failures are visible without SSH-ing into the server.
+### TASK-021 — Structured logging + error monitoring — PARTIALLY DONE
+`app/utils/logging.py` adds a one-line-per-record JSON formatter (stdlib
+only, no new deps) and `configure_logging` is called from `create_app`.
+JSON output in production, human text when DEBUG or TESTING. Idempotent
+under re-create (tests). Sentry/error-tracker integration deferred — the
+JSON shape is ready to feed a collector without rework.
 
 ### TASK-022 — API token lifecycle
 Access tokens are stateless signed tokens with no revocation. Acceptable for
