@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t("dashboard.my_tasks") }} - {{ t("app_name") }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: rgba(30, 41, 59, 0.95);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.2);
+        }
+        
+        body.light-theme {
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: var(--bg-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text-primary);
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            right: 0;
+            height: 100vh;
+            width: 280px;
+            background: var(--bg-secondary);
+            padding: 30px 20px;
+            z-index: 1000;
+            box-shadow: -5px 0 30px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-header {
+            text-align: center;
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 30px;
+        }
+        
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 36px;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .user-name {
+            color: var(--text-primary);
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .user-username {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .sidebar-stats {
+            margin-bottom: 30px;
+        }
+        
+        .stat-item {
+            background: var(--bg-primary);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .stat-value small {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+        
+        .theme-toggle {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .theme-toggle:hover {
+            background: var(--bg-card);
+        }
+        
+        .btn-logout {
+            width: 100%;
+            padding: 12px;
+            background: rgba(239, 68, 68, 0.1);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            display: block;
+            text-align: center;
+        }
+        
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .main-content {
+            margin-right: 280px;
+            padding: 30px;
+            min-height: 100vh;
+        }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 5px;
+        }
+        
+        .page-subtitle {
+            color: var(--text-secondary);
+            font-size: 16px;
+        }
+        
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+        
+        .card-body {
+            padding: 25px;
+        }
+        
+        .card-body h5, .card-body h6 {
+            color: var(--text-primary) !important;
+        }
+        
+        .card-body small {
+            color: var(--text-secondary) !important;
+        }
+        
+        .add-task-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        
+        .add-task-card h5 {
+            color: white;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+        
+        .add-task-card .form-control,
+        .add-task-card .form-select,
+        .add-task-card .form-textarea {
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            border-radius: 12px;
+            padding: 12px 15px;
+        }
+        
+        .add-task-card .form-control::placeholder,
+        .add-task-card .form-textarea::placeholder {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .add-task-card .form-control,
+        .add-task-card .form-select,
+        .add-task-card .form-textarea {
+            color: white !important;
+        }
+        
+        .add-task-card .form-control:focus,
+        .add-task-card .form-select:focus,
+        .add-task-card .form-textarea:focus {
+            background: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: white;
+            box-shadow: none;
+        }
+        
+        .add-task-card .form-select option {
+            background: #1e293b;
+            color: white;
+        }
+        
+        .add-task-card .form-label {
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+        
+        .btn-add-task {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-add-task:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255, 255, 255, 0.3);
+        }
+        
+        .task-item {
+            background: var(--bg-primary);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-right: 4px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .task-item:hover {
+            opacity: 0.9;
+            transform: translateX(-5px);
+        }
+        
+        .task-item.priority-high {
+            border-right-color: #ef4444;
+        }
+        
+        .task-item.priority-medium {
+            border-right-color: #f59e0b;
+        }
+        
+        .task-item.priority-low {
+            border-right-color: #10b981;
+        }
+        
+        .task-item.done {
+            opacity: 0.6;
+        }
+        
+        .task-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .task-title.done {
+            text-decoration: line-through;
+        }
+        
+        .task-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        
+        .task-meta {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        
+        .task-category {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .task-hours {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+        }
+        
+        .task-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-action {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-action:hover {
+            transform: scale(1.1);
+        }
+        
+        .btn-edit {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .btn-delete {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+        
+        .btn-toggle {
+            background: #dcfce7;
+            color: #166534;
+        }
+        
+        .btn-toggle.done {
+            background: #10b981;
+            color: white;
+        }
+        
+        .users-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .user-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 15px;
+            padding: 20px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+        
+        .user-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .user-card.current-user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+        }
+        
+        .user-card-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        
+        .user-card.current-user .user-card-avatar {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .user-card-name {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .user-card-username {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-bottom: 15px;
+        }
+        
+        .user-card-stats {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 15px;
+            border-top: 1px solid;
+            border-top-color: var(--border-color);
+        }
+        
+        .user-card.current-user .user-card-stats {
+            border-top-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .user-stat {
+            text-align: center;
+        }
+        
+        .user-stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .user-stat-label {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 3px;
+        }
+        
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .modal-header {
+            border-bottom: 1px solid var(--border-color);
+            padding: 25px;
+        }
+        
+        .modal-body {
+            padding: 25px;
+        }
+        
+        .modal-body label {
+            color: var(--text-primary);
+        }
+        
+        .modal-body .form-control,
+        .modal-body .form-select,
+        .modal-body .form-textarea {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+        }
+        
+        .modal-body .form-control::placeholder,
+        .modal-body .form-textarea::placeholder {
+            color: var(--text-secondary) !important;
+        }
+        
+        .modal-body .form-control:focus,
+        .modal-body .form-select:focus,
+        .modal-body .form-textarea:focus {
+            background: var(--bg-primary);
+            border-color: #667eea;
+            color: var(--text-primary);
+        }
+        
+        .modal-body .form-select option {
+            background: var(--bg-secondary);
+        }
+        
+        .modal-footer {
+            border-top: 1px solid var(--border-color);
+            padding: 20px 25px;
+        }
+        
+        .btn-close {
+            filter: invert(1);
+        }
+        
+        body.light-theme .btn-close {
+            filter: invert(0);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        .progress {
+            height: 12px;
+            border-radius: 10px;
+            background: var(--bg-primary);
+        }
+        
+        .progress-bar {
+            border-radius: 10px;
+            background: linear-gradient(90deg, #10b981 0%, #3b82f6 100%);
+        }
+        
+        .manage-section {
+            background: var(--bg-primary);
+            padding: 20px;
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+        
+        .manage-section h6 {
+            color: var(--text-primary);
+            margin-bottom: 15px;
+        }
+        
+        .manage-section .form-control,
+        .manage-section .form-select {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary) !important;
+        }
+        
+        .manage-section .form-control::placeholder {
+            color: var(--text-secondary) !important;
+        }
+    </style>
+</head>
+<body class="{{ 'light-theme' if theme == 'light' else '' }}">
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <div class="user-avatar">
+                {{ fullname[0].upper() }}
+            </div>
+            <div class="user-name">{{ fullname }}</div>
+            <div class="user-username">@{{ current_user }}</div>
+        </div>
+        
+        <div class="sidebar-stats">
+            <div class="stat-item">
+                <div class="stat-label">{{ t("stats.today_hours") }}</div>
+                <div class="stat-value">{{ "%.1f"|format(today_hours) }} <small>ساعت</small></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">{{ t("stats.this_week") }}</div>
+                <div class="stat-value">{{ "%.1f"|format(total_week_hours) }} <small>ساعت</small></div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-label">{{ t("stats.done_tasks") }}</div>
+                <div class="stat-value">{{ total_done }} <small>از {{ total_tasks }}</small></div>
+            </div>
+        </div>
+        
+        <button class="theme-toggle" onclick="toggleTheme()">
+            <i class="bi bi-{{ "sun" if theme == "dark" else "moon" }}"></i> 
+            تم {{ 'روشن' if theme == 'dark' else 'تاریک' }}
+        </button>
+        
+        <a href="/logout" class="btn-logout">
+            <i class="bi bi-box-arrow-left"></i> {{ t("nav.logout") }}
+        </a>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="main-content">
+        <div class="page-header">
+            <h1 class="page-title">{{ t("dashboard.greeting", name=fullname) }} 👋</h1>
+            <p class="page-subtitle">{{ t("dashboard.today") }}: {{ today }}</p>
+        </div>
+        
+        <!-- Add Task Card -->
+        <div class="card add-task-card">
+            <div class="card-body">
+                <h5><i class="bi bi-plus-circle"></i> {{ t("dashboard.add_task") }}</h5>
+                <form method="POST">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">درس</label>
+                            <select name="course_key" class="form-select" required>
+                                <option value="">{{ t("dashboard.select_course") }}</option>
+                                {% for course in courses %}
+                                <option value="{{ course.key }}">{{ course.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">اولویت</label>
+                            <select name="priority" class="form-select">
+                                <option value="high">🔴 {{ t("priority.high") }}</option>
+                                <option value="medium" selected>🟡 {{ t("priority.medium") }}</option>
+                                <option value="low">🟢 {{ t("priority.low") }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">ساعت</label>
+                            <input type="number" step="0.5" name="task_hours" class="form-control" placeholder="2" value="1" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="submit" name="action" value="new_task" class="btn btn-add-task w-100">
+                                <i class="bi bi-plus-lg"></i> {{ t("dashboard.add_task_btn") }}
+                            </button>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">توضیحات (اختیاری)</label>
+                            <textarea name="description" class="form-control form-textarea" rows="2" placeholder="{{ t('dashboard.description_placeholder') }}"></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- Tasks Column -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                            <h5 class="mb-0"><i class="bi bi-list-task"></i> {{ t("dashboard.my_tasks") }}</h5>
+                            <div class="progress" style="width: 200px;">
+                                <div class="progress-bar" style="width: {{ (total_done / total_tasks * 100) if total_tasks > 0 else 0 }}%"></div>
+                            </div>
+                        </div>
+                        
+                        {% if tasks %}
+                            {% for task in tasks %}
+                            <div class="task-item priority-{{ task.priority }} {% if task.done %}done{% endif %}">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="task-title {% if task.done %}done{% endif %}">
+                                            {{ task.display_title() }}
+                                        </div>
+                                        {% if task.description %}
+                                        <div class="task-description">
+                                            {{ task.description }}
+                                        </div>
+                                        {% endif %}
+                                        <div class="task-meta">
+                                            <span class="task-category">{{ task.display_title() }}</span>
+                                            <span class="task-hours">
+                                                <i class="bi bi-clock"></i> {{ task.hours }} ساعت
+                                            </span>
+                                            <span>
+                                                <i class="bi bi-calendar3"></i> {{ task.created_at }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div class="task-actions">
+                                        <button class="btn-action btn-edit" data-bs-toggle="modal" data-bs-target="#editModal{{ task.id }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <form method="POST" class="d-inline" onsubmit="return confirm('{{ t("dashboard.confirm_delete") }}')">
+                                            <button name="action" value="delete" class="btn-action btn-delete"><input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        <form method="POST" class="d-inline">
+                                            <button name="action" value="toggle" class="btn-action btn-toggle {% if task.done %}done{% endif %}"><input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <i class="bi bi-check-lg"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Edit Modal -->
+                            <div class="modal fade" id="editModal{{ task.id }}">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">{{ t("dashboard.edit_task") }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <form method="POST">
+                                            <div class="modal-body">
+                                                <input type="hidden" name="action" value="edit"><input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <div class="mb-3">
+                                                    <label class="form-label">درس</label>
+                                                    <select name="course_key" class="form-select" required>
+                                                        {% for course in courses %}
+                                                        <option value="{{ course }}" {% if course == task.title %}selected{% endif %}>{{ course }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">اولویت</label>
+                                                    <select name="priority" class="form-select">
+                                                        <option value="high" {% if task.priority == 'high' %}selected{% endif %}>🔴 {{ t("priority.high") }}</option>
+                                                        <option value="medium" {% if task.priority == 'medium' %}selected{% endif %}>🟡 {{ t("priority.medium") }}</option>
+                                                        <option value="low" {% if task.priority == 'low' %}selected{% endif %}>🟢 {{ t("priority.low") }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">ساعت</label>
+                                                    <input type="number" step="0.5" name="task_hours" class="form-control" value="{{ task.hours }}" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">توضیحات (اختیاری)</label>
+                                                    <textarea name="description" class="form-control form-textarea" rows="3">{{ task.description }}</textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ t("dashboard.cancel") }}</button>
+                                                <button type="submit" class="btn btn-primary">{{ t("dashboard.save") }}</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <p>{{ t("dashboard.no_tasks") }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Manage Majors and Courses -->
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-gear"></i> {{ t("dashboard.manage_majors") }}</h5>
+
+                        <div class="manage-section">
+                            <h6>{{ t("dashboard.add_major") }}</h6>
+                            <form method="POST" class="row g-2">
+                                <input type="hidden" name="action" value="add_major">
+                                <div class="col-5">
+                                    <label class="form-label small text-muted mb-1">فارسی</label>
+                                    <input type="text" id="dash-major-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.major_fa_placeholder') }}" required>
+                                </div>
+                                <div class="col-5">
+                                    <label class="form-label small text-muted mb-1">English</label>
+                                    <input type="text" id="dash-major-en" name="name_en" class="form-control" placeholder="e.g. Electrical Engineering" required>
+                                </div>
+                                <div class="col-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-primary w-100"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <div class="manage-section">
+                            <h6>{{ t("dashboard.add_course_to_major") }}</h6>
+                            <form method="POST" class="row g-2">
+                                <input type="hidden" name="action" value="add_course">
+                                <div class="col-3">
+                                    <label class="form-label small text-muted mb-1">{{ t("dashboard.course") }}</label>
+                                    <select name="major_key" class="form-select" required>
+                                        {% for m in majors %}
+                                        <option value="{{ m.key }}">{{ m.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-3">
+                                    <label class="form-label small text-muted mb-1">فارسی</label>
+                                    <input type="text" id="dash-course-fa" name="name_fa" class="form-control" placeholder="{{ t('dashboard.course_fa_placeholder') }}" required>
+                                </div>
+                                <div class="col-4">
+                                    <label class="form-label small text-muted mb-1">English</label>
+                                    <input type="text" id="dash-course-en" name="name_en" class="form-control" placeholder="e.g. Statistics" required>
+                                </div>
+                                <div class="col-2 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-success w-100"><i class="bi bi-plus"></i></button>
+                                </div>
+                            </form>
+                        </div>
+
+                        {% for m in majors %}
+                        <div class="manage-section">
+                            <h6>{{ m.name }}</h6>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for c in m.courses %}
+                                <form method="POST" class="d-inline" onsubmit="return confirm('{{ t("dashboard.confirm_delete") }}')">
+                                    <input type="hidden" name="action" value="delete_course">
+                                    <input type="hidden" name="course_id" value="{{ c.id if c.id is defined else c.key }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">
+                                        {{ c.name }} <i class="bi bi-x"></i>
+                                    </button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Stats Column -->
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-graph-up"></i> {{ t("stats.weekly_chart") }}</h5>
+                        <div style="height: 200px;">
+                            <canvas id="weekChart"></canvas>
+                        </div>
+                        <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
+                            {{ t("stats.total") }}: {{ "%.1f"|format(total_week_hours) }} {{ t("stats.hours_unit") }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-calendar3"></i> {{ t("stats.monthly_chart") }}</h5>
+                        <div style="height: 200px;">
+                            <canvas id="monthChart"></canvas>
+                        </div>
+                        <p class="text-center mt-3" style="color: var(--text-secondary); font-size: 14px;">
+                            {{ t("stats.total") }}: {{ "%.1f"|format(total_month_hours) }} {{ t("stats.hours_unit") }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="mb-3"><i class="bi bi-pie-chart"></i> {{ t("stats.course_stats") }}</h5>
+                        {% for course_key, stats in course_stats.items() %}
+                            {% if stats.total > 0 %}
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small>{{ stats.name }}</small>
+                                    <small style="color: var(--text-secondary);">{{ stats.hours }}h / {{ stats.done }}/{{ stats.total }}</small>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar" style="width: {{ (stats.done / stats.total * 100) if stats.total > 0 else 0 }}%"></div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Users Section -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="mb-3"><i class="bi bi-people"></i> {{ t("dashboard.all_users") }}</h5>
+                <div class="users-grid">
+                    {% for user in all_users %}
+                    <a href="/user/{{ user.username }}" class="user-card {% if user.is_current %}current-user{% endif %}">
+                        <div class="user-card-avatar">{{ user.fullname[0].upper() }}</div>
+                        <div class="user-card-name">{{ user.fullname }}</div>
+                        <div class="user-card-username">@{{ user.username }}</div>
+                        <div class="user-card-stats">
+                            <div class="user-stat">
+                                <div class="user-stat-value">{{ user.done_tasks }}</div>
+                                <div class="user-stat-label">{{ t("users.done") }}</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value">{{ user.total_tasks }}</div>
+                                <div class="user-stat-label">{{ t("users.total_tasks") }}</div>
+                            </div>
+                            <div class="user-stat">
+                                <div class="user-stat-value">{{ "%.1f"|format(user.today_hours) }}</div>
+                                <div class="user-stat-label">{{ t("stats.today_hours") }}</div>
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>
+        function toggleTheme() {
+            fetch('/toggle-theme', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                location.reload();
+            });
+        }
+        
+        // تنظیمات رنگ برای Chart.js
+        const isDark = document.body.classList.contains('light-theme') ? false : true;
+        const textColor = isDark ? '#f1f5f9' : '#1e293b';
+        const gridColor = isDark ? 'rgba(148, 163, 184, 0.2)' : '#e2e8f0';
+        
+        // نمودار هفتگی - فقط یکبار
+        const weekChartCanvas = document.getElementById('weekChart');
+        if (weekChartCanvas && !weekChartCanvas.chartInstance) {
+            const weekData = {{ week_hours | tojson }};
+            const weekLabels = Object.keys(weekData).reverse().map(d => d.substring(5));
+            const weekValues = Object.keys(weekData).reverse().map(k => weekData[k]);
+            
+            weekChartCanvas.chartInstance = new Chart(weekChartCanvas, {
+                type: 'bar',
+                data: {
+                    labels: weekLabels,
+                    datasets: [{
+                        label: 'ساعت مطالعه',
+                        data: weekValues,
+                        backgroundColor: 'rgba(102, 126, 234, 0.8)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        borderWidth: 2,
+                        borderRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { color: textColor },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // نمودار ماهانه - فقط یکبار
+        const monthChartCanvas = document.getElementById('monthChart');
+        if (monthChartCanvas && !monthChartCanvas.chartInstance) {
+            const monthData = {{ month_hours | tojson }};
+            const monthLabels = Object.keys(monthData).reverse().map(d => d.substring(5));
+            const monthValues = Object.keys(monthData).reverse().map(k => monthData[k]);
+            
+            monthChartCanvas.chartInstance = new Chart(monthChartCanvas, {
+                type: 'line',
+                data: {
+                    labels: monthLabels,
+                    datasets: [{
+                        label: 'ساعت مطالعه',
+                        data: monthValues,
+                        borderColor: 'rgba(16, 185, 129, 1)',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: textColor },
+                            grid: { color: gridColor }
+                        },
+                        x: {
+                            ticks: { 
+                                color: textColor,
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    
+        // ── ترجمه خودکار فرم‌های رشته و درس ──
+        AutoTranslate.bind('#dash-major-fa',  '#dash-major-en');
+        AutoTranslate.bind('#dash-course-fa', '#dash-course-en');
+</script>
+<script>
+document.querySelectorAll('form[method="POST"]').forEach((form) => {
+    form.insertAdjacentHTML('afterbegin', '<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">');
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,122 @@
+{
+  "lang": "en",
+  "dir": "ltr",
+  "app_name": "Study Planner",
+  "nav": {
+    "logout": "Logout",
+    "admin_panel": "Admin Panel",
+    "dashboard": "Dashboard"
+  },
+  "auth": {
+    "login_title": "Sign In",
+    "register_title": "Create Account",
+    "username": "Username",
+    "password": "Password",
+    "fullname": "Full Name",
+    "login_btn": "Sign In",
+    "register_btn": "Register",
+    "no_account": "Don't have an account?",
+    "have_account": "Already have an account?",
+    "register_link": "Register",
+    "login_link": "Sign in",
+    "invalid_credentials": "Invalid username or password!",
+    "fill_all_fields": "Please fill in all fields!",
+    "username_taken": "This username is already taken!",
+    "register_success": "Registration successful! Please sign in."
+  },
+  "dashboard": {
+    "greeting": "Hello, {name}!",
+    "today": "Today",
+    "my_tasks": "My Tasks",
+    "add_task": "Add New Task",
+    "course": "Course",
+    "select_course": "Select...",
+    "priority": "Priority",
+    "hours": "Hours",
+    "description": "Description",
+    "description_placeholder": "Add more details...",
+    "add_task_btn": "Add Task",
+    "no_tasks": "No tasks yet!",
+    "edit_task": "Edit Task",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm_delete": "Are you sure?",
+    "all_users": "All Users",
+    "manage_majors": "Manage Majors & Courses",
+    "add_major": "Add New Major",
+    "major_name_placeholder": "Major name...",
+    "add_course_to_major": "Add Course to Major",
+    "course_name_placeholder": "Course name...",
+    "courses_of": "Courses",
+    "major_fa_placeholder": "e.g. Electrical Eng.",
+    "course_fa_placeholder": "e.g. Statistics"
+  },
+  "stats": {
+    "today_hours": "Today's Hours",
+    "this_week": "This Week",
+    "done_tasks": "Completed Tasks",
+    "from": "of",
+    "hours_unit": "hrs",
+    "weekly_chart": "Weekly Chart",
+    "monthly_chart": "Monthly Chart",
+    "course_stats": "Course Stats",
+    "total": "Total",
+    "study_hours": "Study Hours"
+  },
+  "priority": {
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low"
+  },
+  "users": {
+    "done": "Completed",
+    "total_tasks": "Total Tasks",
+    "today_hours": "Today's Hours"
+  },
+  "admin": {
+    "title": "Admin Panel",
+    "total_users": "Total Users",
+    "total_tasks": "Total Tasks",
+    "completed_tasks": "Completed Tasks",
+    "users_list": "Users List",
+    "change_password": "Change Password",
+    "delete_user": "Delete User",
+    "new_password": "New Password",
+    "confirm_delete_user": "Delete this user?",
+    "majors_management": "Majors Management",
+    "add_major": "Add Major",
+    "major_name": "Major Name",
+    "add_course": "Add Course",
+    "select_major": "Select Major",
+    "course_name": "Course Name",
+    "week_hours": "Week Hours",
+    "total_hours": "Total Hours",
+    "member_since": "Member Since",
+    "system_stats": "System Stats",
+    "unauthorized": "Unauthorized access!"
+  },
+  "theme": {
+    "light": "Light Theme",
+    "dark": "Dark Theme",
+    "switch_to_light": "Light Mode",
+    "switch_to_dark": "Dark Mode"
+  },
+  "majors": {
+    "computer_science": "Computer Science"
+  },
+  "courses": {
+    "data_structures": "Data Structures",
+    "algorithms": "Algorithm Design",
+    "artificial_intelligence": "Artificial Intelligence",
+    "theory_of_languages": "Theory of Languages",
+    "logic_circuits": "Logic Circuits",
+    "computer_architecture": "Computer Architecture",
+    "operating_systems": "Operating Systems",
+    "computer_networks": "Computer Networks",
+    "database": "Database",
+    "math1": "Mathematics 1",
+    "math2": "Mathematics 2",
+    "probability": "Probability",
+    "discrete_math": "Discrete Mathematics"
+  }
+}

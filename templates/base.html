@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}" dir="{{ dir }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ t('app_name') }}{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+{% block body %}{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+{# ── Auto-translate helper ── #}
+<script>
+/**
+ * AutoTranslate — کمک‌کننده ترجمه خودکار در فرم‌ها
+ *
+ * وقتی کاربر در یه فیلد تایپ می‌کنه، فیلد مقابل رو خودکار پر می‌کنه.
+ * اگه LibreTranslate در دسترس نباشه، یه پیام نشون میده و فرم به حالت دستی میره.
+ */
+const AutoTranslate = (() => {
+    let available = {{ 'true' if translator_available else 'false' }};
+    let debounceTimer = null;
+
+    async function translate(text) {
+        if (!available || !text.trim()) return null;
+        try {
+            const res = await fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token() }}' },
+                body: JSON.stringify({ text })
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch {
+            available = false;
+            return null;
+        }
+    }
+
+    /**
+     * bind — یه جفت input فارسی/انگلیسی رو به هم وصل می‌کنه
+     *
+     * @param {string} faSelector  - CSS selector فیلد فارسی
+     * @param {string} enSelector  - CSS selector فیلد انگلیسی
+     * @param {number} delay       - تاخیر debounce (ms)
+     */
+    function bind(faSelector, enSelector, delay = 600) {
+        const faInput = document.querySelector(faSelector);
+        const enInput = document.querySelector(enSelector);
+        if (!faInput || !enInput) return;
+
+        // نشانگر وضعیت ترجمه
+        function showStatus(input, state) {
+            const icon = input.parentElement.querySelector('.translate-status');
+            if (!icon) return;
+            icon.className = 'translate-status ms-1';
+            if (state === 'loading')  icon.innerHTML = '<span class="spinner-border spinner-border-sm text-secondary"></span>';
+            if (state === 'done')     icon.innerHTML = '<i class="bi bi-check-circle text-success"></i>';
+            if (state === 'error')    icon.innerHTML = '<i class="bi bi-exclamation-circle text-warning"></i>';
+            if (state === 'none')     icon.innerHTML = '';
+        }
+
+        async function onInput(sourceInput, targetInput) {
+            const text = sourceInput.value.trim();
+            if (!text) { targetInput.value = ''; showStatus(sourceInput, 'none'); return; }
+
+            // اگه کاربر خودش target رو پر کرده، ترجمه نکن
+            if (targetInput.value.trim()) return;
+
+            showStatus(sourceInput, 'loading');
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(async () => {
+                const result = await translate(text);
+                if (result && result.success) {
+                    const isSourceFa = (sourceInput === faInput);
+                    targetInput.value = isSourceFa ? result.en : result.fa;
+                    showStatus(sourceInput, 'done');
+                } else {
+                    showStatus(sourceInput, 'error');
+                    if (!available) showOfflineNotice();
+                }
+            }, delay);
+        }
+
+        faInput.addEventListener('input', () => onInput(faInput, enInput));
+        enInput.addEventListener('input', () => onInput(enInput, faInput));
+
+        // اضافه کردن اسپن وضعیت بعد از label
+        [faInput, enInput].forEach(inp => {
+            if (!inp.parentElement.querySelector('.translate-status')) {
+                const span = document.createElement('span');
+                span.className = 'translate-status ms-1';
+                inp.parentElement.appendChild(span);
+            }
+        });
+    }
+
+    function showOfflineNotice() {
+        if (document.getElementById('translator-offline-notice')) return;
+        const div = document.createElement('div');
+        div.id = 'translator-offline-notice';
+        div.className = 'alert alert-warning alert-dismissible fade show position-fixed bottom-0 end-0 m-3';
+        div.style.zIndex = '9999';
+        div.innerHTML = `
+            <i class="bi bi-wifi-off"></i>
+            <strong>ترجمه خودکار در دسترس نیست.</strong>
+            لطفاً هر دو فیلد را دستی پر کنید.
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(div);
+        setTimeout(() => div.remove(), 6000);
+    }
+
+    return { bind, translate, isAvailable: () => available };
+})();
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>
