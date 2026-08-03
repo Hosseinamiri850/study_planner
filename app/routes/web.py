@@ -94,7 +94,7 @@ def dashboard():
 
 def _handle_dashboard_action(user):
     action = request.form.get("action")
-    task = db.session.get(Task, request.form.get("task_id", type=int)) if action in {"toggle", "delete", "edit"} else None
+    task = db.session.get(Task, request.form.get("task_id", type=int)) if action in {"toggle", "delete", "edit", "start_session", "stop_session"} else None
     if action == "new_task" and request.form.get("course_key"):
         hours = positive_hours(request.form.get("task_hours"))
         if hours is None or not valid_priority(request.form.get("priority", "medium")):
@@ -107,6 +107,17 @@ def _handle_dashboard_action(user):
         if action == "toggle":
             task.mark_pending() if task.done else task.mark_complete()
         elif action == "delete": db.session.delete(task)
+        elif action == "start_session":
+            if task.active_session is None:
+                task.start_session()
+            else:
+                flash("A session is already running for this task.", "error")
+        elif action == "stop_session":
+            session = task.active_session
+            if session is not None:
+                session.stop()
+            else:
+                flash("No active session to stop.", "error")
         elif action == "edit":
             task.course_key, task.priority, task.description = request.form.get("course_key", task.course_key), request.form.get("priority", task.priority), request.form.get("description", "")
             task.course = Course.query.filter_by(key=task.course_key).first()
