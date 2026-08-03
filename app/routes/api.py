@@ -3,12 +3,12 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.config import Config
 from app.extensions import csrf, db, limiter
+from app.integrations.translator import auto_translate
+from app.integrations.translator import is_available as translator_available
 from app.models import Course, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import api_auth_required, create_access_token, login_required
 from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
-from translator import auto_translate
-from translator import is_available as translator_available
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
 

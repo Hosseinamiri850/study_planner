@@ -104,7 +104,7 @@ class TestI18n:
         Cached version (`is_available_cached`) should call the network at most
         once, then serve from the TTL cache on subsequent calls.
         """
-        import translator as translator_mod
+        from app.integrations import translator as translator_mod
 
         calls = {"n": 0}
 
@@ -126,7 +126,7 @@ class TestI18n:
         translator_mod.reset_availability_cache()
 
     def test_translator_availability_cached_expires_after_ttl(self, app, monkeypatch):
-        import translator as translator_mod
+        from app.integrations import translator as translator_mod
 
         calls = {"n": 0}
 
@@ -138,7 +138,7 @@ class TestI18n:
         translator_mod.reset_availability_cache()
 
         # Force the cache entry to be already-expired on the second call.
-        import translator
+        from app.integrations import translator
         with app.test_request_context():
             translator.is_available_cached()  # populates cache
             # Manually expire it without waiting 60s.

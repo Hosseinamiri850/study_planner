@@ -28,13 +28,14 @@ app/
   routes/         Blueprints: web (browser, session auth), admin (browser, session
                    auth + is_admin), api (JSON, Bearer token auth).
   services/       Business/read logic: seed.py (explicit, never auto-run), statistics.py.
+  integrations/   translator.py — LibreTranslate integration (translate, auto-translate,
+                   availability cache).
   utils/          auth.py (decorators + token helpers), i18n.py, validation.py.
 migrations/       Alembic. Two revisions so far: 20260723_01 (initial), 20260723_02
                    (Task.status/estimated_hours/course_id + StudySession table).
-translator.py     LibreTranslate integration. Lives at repo root, NOT under app/ —
-                   this is a known inconsistency, see .ai/TODO.md TASK-023.
 tests/            pytest, in-memory SQLite. Good fixture coverage in conftest.py.
-                   94 tests covering models/, services/, utils/, and api.py.
+                   154 tests covering models/, services/, utils/, integrations/,
+                   api.py, web.py, admin.py, CLI commands, and rate limiting.
 ```
 
 Two parallel auth systems exist by design and must both keep working:
