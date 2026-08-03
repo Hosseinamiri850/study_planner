@@ -1,0 +1,122 @@
+{
+  "lang": "fa",
+  "dir": "rtl",
+  "app_name": "برنامه‌ریز مطالعه",
+  "nav": {
+    "logout": "خروج",
+    "admin_panel": "پنل مدیریت",
+    "dashboard": "داشبورد"
+  },
+  "auth": {
+    "login_title": "ورود به حساب",
+    "register_title": "ثبت‌نام",
+    "username": "نام کاربری",
+    "password": "رمز عبور",
+    "fullname": "نام کامل",
+    "login_btn": "ورود",
+    "register_btn": "ثبت‌نام",
+    "no_account": "حساب ندارید؟",
+    "have_account": "حساب دارید؟",
+    "register_link": "ثبت‌نام کنید",
+    "login_link": "وارد شوید",
+    "invalid_credentials": "نام کاربری یا رمز عبور اشتباه است!",
+    "fill_all_fields": "لطفاً همه فیلدها را پر کنید!",
+    "username_taken": "این نام کاربری قبلاً ثبت شده است!",
+    "register_success": "ثبت‌نام با موفقیت انجام شد! وارد شوید."
+  },
+  "dashboard": {
+    "greeting": "سلام، {name}!",
+    "today": "امروز",
+    "my_tasks": "تسک‌های من",
+    "add_task": "تسک جدید اضافه کن",
+    "course": "درس",
+    "select_course": "انتخاب کنید...",
+    "priority": "اولویت",
+    "hours": "ساعت",
+    "description": "توضیحات",
+    "description_placeholder": "توضیحات بیشتر...",
+    "add_task_btn": "افزودن تسک",
+    "no_tasks": "هنوز تسکی اضافه نکردی!",
+    "edit_task": "ویرایش تسک",
+    "save": "ذخیره",
+    "cancel": "لغو",
+    "confirm_delete": "مطمئنی؟",
+    "all_users": "همه کاربران",
+    "manage_majors": "مدیریت رشته و دروس",
+    "add_major": "افزودن رشته جدید",
+    "major_name_placeholder": "نام رشته جدید...",
+    "add_course_to_major": "افزودن درس به رشته",
+    "course_name_placeholder": "نام درس...",
+    "courses_of": "دروس",
+    "major_fa_placeholder": "مثلاً: مهندسی برق",
+    "course_fa_placeholder": "مثلاً: آمار"
+  },
+  "stats": {
+    "today_hours": "ساعت امروز",
+    "this_week": "این هفته",
+    "done_tasks": "تسک‌های انجام شده",
+    "from": "از",
+    "hours_unit": "ساعت",
+    "weekly_chart": "نمودار هفتگی",
+    "monthly_chart": "نمودار ماهانه",
+    "course_stats": "آمار دروس",
+    "total": "مجموع",
+    "study_hours": "ساعت مطالعه"
+  },
+  "priority": {
+    "high": "مهم",
+    "medium": "متوسط",
+    "low": "کم"
+  },
+  "users": {
+    "done": "انجام شده",
+    "total_tasks": "کل تسک",
+    "today_hours": "ساعت امروز"
+  },
+  "admin": {
+    "title": "پنل مدیریت",
+    "total_users": "کل کاربران",
+    "total_tasks": "کل تسک‌ها",
+    "completed_tasks": "تسک‌های انجام شده",
+    "users_list": "لیست کاربران",
+    "change_password": "تغییر رمز",
+    "delete_user": "حذف کاربر",
+    "new_password": "رمز جدید",
+    "confirm_delete_user": "کاربر حذف شود؟",
+    "majors_management": "مدیریت رشته‌ها",
+    "add_major": "افزودن رشته",
+    "major_name": "نام رشته",
+    "add_course": "افزودن درس",
+    "select_major": "انتخاب رشته",
+    "course_name": "نام درس",
+    "week_hours": "ساعت هفته",
+    "total_hours": "کل ساعت",
+    "member_since": "عضو از",
+    "system_stats": "آمار سیستم",
+    "unauthorized": "دسترسی غیرمجاز!"
+  },
+  "theme": {
+    "light": "تم روشن",
+    "dark": "تم تاریک",
+    "switch_to_light": "تم روشن",
+    "switch_to_dark": "تم تاریک"
+  },
+  "majors": {
+    "computer_science": "مهندسی کامپیوتر"
+  },
+  "courses": {
+    "data_structures": "ساختمان داده",
+    "algorithms": "طراحی الگوریتم",
+    "artificial_intelligence": "هوش مصنوعی",
+    "theory_of_languages": "نظریه زبان",
+    "logic_circuits": "مدار منطقی",
+    "computer_architecture": "معماری کامپیوتر",
+    "operating_systems": "سیستم عامل",
+    "computer_networks": "شبکه‌های کامپیوتری",
+    "database": "پایگاه داده",
+    "math1": "ریاضی ۱",
+    "math2": "ریاضی ۲",
+    "probability": "احتمال",
+    "discrete_math": "ریاضی گسسته"
+  }
+}
