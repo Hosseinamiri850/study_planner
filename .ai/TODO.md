@@ -101,9 +101,11 @@ TASK-011.
 
 ## P1 — needed before real users / before scaling past a handful of people
 
-### TASK-014 — Rate limiting on auth endpoints
-`/login`, `/register`, `/api/auth/login`, `/api/auth/register` have no
-throttling. Add Flask-Limiter (or equivalent) before any public deployment.
+### TASK-014 — Rate limiting on auth endpoints — DONE
+`/login`, `/register`, `/api/auth/login`, `/api/auth/register` are throttled
+at 5/min per IP via Flask-Limiter (`app/extensions.py`, initialized in
+`create_app`). Storage: Redis when `RATELIMIT_STORAGE_URI` is set, in-memory
+otherwise. Tests in `tests/test_rate_limiting.py`.
 
 ### TASK-015 — Test coverage for browser routes
 Add `tests/test_routes_web.py` and `tests/test_routes_admin.py` covering

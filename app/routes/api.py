@@ -1,7 +1,8 @@
 from flask import Blueprint, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app.extensions import csrf, db
+from app.config import Config
+from app.extensions import csrf, db, limiter
 from app.models import Course, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import api_auth_required, create_access_token, login_required
@@ -42,6 +43,7 @@ def _resolve_course(data, existing=None):
 
 @api_bp.route("/auth/register", methods=["POST"])
 @csrf.exempt
+@limiter.limit(Config.RATELIMIT_AUTH)
 def register():
     data = request.get_json(silent=True) or {}
     username = str(data.get("username", "")).strip()
@@ -59,6 +61,7 @@ def register():
 
 @api_bp.route("/auth/login", methods=["POST"])
 @csrf.exempt
+@limiter.limit(Config.RATELIMIT_AUTH)
 def login():
     data = request.get_json(silent=True) or {}
     user = User.query.filter_by(username=str(data.get("username", "")).strip()).first()
