@@ -7,7 +7,13 @@ from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
 from app.models import Course, StudySession, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
-from app.utils.auth import api_auth_required, create_access_token, login_required
+from app.utils.auth import (
+    api_auth_required,
+    create_access_token,
+    issue_refresh_token,
+    login_required,
+    rotate_refresh_token,
+)
 from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -56,7 +62,7 @@ def register():
     user = User(username=username, password=generate_password_hash(password), fullname=fullname)
     db.session.add(user)
     db.session.commit()
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user)}), 201
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)}), 201
 
 
 @api_bp.route("/auth/login", methods=["POST"])
@@ -67,7 +73,27 @@ def login():
     user = User.query.filter_by(username=str(data.get("username", "")).strip()).first()
     if not user or not check_password_hash(user.password, str(data.get("password", ""))):
         return _error("Invalid username or password.", 401)
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user)})
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)})
+
+
+@api_bp.route("/auth/refresh", methods=["POST"])
+@csrf.exempt
+@limiter.limit(Config.RATELIMIT_AUTH)
+def refresh():
+    """Exchange a valid refresh token for a fresh access + refresh pair.
+
+    Rotation: the presented refresh token is revoked; the response contains
+    a new refresh token. Clients must replace their stored refresh token.
+    """
+    data = request.get_json(silent=True) or {}
+    signed = str(data.get("refresh_token", "")).strip()
+    if not signed:
+        return _error("refresh_token is required.", 400)
+    user, access, refresh_tok = rotate_refresh_token(signed)
+    if user is None:
+        return _error("Invalid or expired refresh token.", 401)
+    db.session.commit()
+    return jsonify({"access_token": access, "refresh_token": refresh_tok})
 
 
 @api_bp.route("/tasks", methods=["GET"])

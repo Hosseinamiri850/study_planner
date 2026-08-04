@@ -6,7 +6,7 @@ import logging
 import pytest
 
 from app import create_app
-from app.utils.logging import JsonFormatter
+from app.utils.logging import JsonFormatter, init_sentry
 
 
 @pytest.fixture(autouse=True)
@@ -101,3 +101,31 @@ class _LoggingTestConfig:
     DEBUG = False
     WTF_CSRF_ENABLED = False
     RATELIMIT_ENABLED = False
+
+
+class TestInitSentry:
+    def test_no_dsn_is_noop(self, app):
+        # No SENTRY_DSN → init_sentry returns without touching the SDK.
+        init_sentry(app)  # should not raise even though sentry_sdk is absent
+
+    def test_dsn_without_sdk_logs_warning(self, app, caplog):
+        app.config["SENTRY_DSN"] = "https://example@sentry.invalid/1"
+        with caplog.at_level(logging.WARNING):
+            init_sentry(app)
+        assert any("sentry-sdk not installed" in r.message for r in caplog.records)
+
+    def test_dsn_with_mock_sdk_initializes(self, app, monkeypatch):
+        import sys
+        from unittest.mock import MagicMock
+        sdk = MagicMock()
+        monkeypatch.setitem(sys.modules, "sentry_sdk", sdk)
+        app.config["SENTRY_DSN"] = "https://example@sentry.invalid/1"
+        app.config["SENTRY_ENVIRONMENT"] = "test-env"
+        app.config["SENTRY_TRACES_SAMPLE_RATE"] = 0.5
+        init_sentry(app)
+        sdk.init.assert_called_once()
+        _, kwargs = sdk.init.call_args
+        assert kwargs["dsn"] == "https://example@sentry.invalid/1"
+        assert kwargs["environment"] == "test-env"
+        assert kwargs["traces_sample_rate"] == 0.5
+        assert kwargs["send_default_pii"] is False

@@ -150,18 +150,23 @@ RATELIMIT_STORAGE_URI can use Redis out of the box). `.dockerignore` keeps
 `.env`, caches, and `.git` out of the image. See README for `docker compose
 up` usage.
 
-### TASK-021 — Structured logging + error monitoring — PARTIALLY DONE
+### TASK-021 — Structured logging + error monitoring — DONE
 `app/utils/logging.py` adds a one-line-per-record JSON formatter (stdlib
 only, no new deps) and `configure_logging` is called from `create_app`.
 JSON output in production, human text when DEBUG or TESTING. Idempotent
-under re-create (tests). Sentry/error-tracker integration deferred — the
-JSON shape is ready to feed a collector without rework.
+under re-create (tests). Sentry integration added via `init_sentry`:
+optional dependency (`sentry-sdk[flask]`), no-op when `SENTRY_DSN` unset or
+SDK not installed. Call once from `create_app` after `configure_logging`.
+Three tests cover no-DSN, DSN-without-SDK (warns), DSN-with-mock-SDK (init).
 
-### TASK-022 — API token lifecycle
-Access tokens are stateless signed tokens with no revocation. Acceptable for
-a v1, but there's no way to force-logout a compromised session or invalidate
-tokens on password change. Needs a token-blacklist or a move to short-lived
-tokens + refresh tokens before the API has real external clients.
+### TASK-022 — API token lifecycle — DONE
+Access tokens stay stateless signed tokens (15 min TTL). Refresh tokens
+added: 30-day TTL, jti tracked in `refresh_tokens` table, rotation on
+`/api/auth/refresh` (old token revoked, new pair issued), revocation on
+admin password-change via `revoke_user_refresh_tokens`. Migration
+`20260804_02_refresh_tokens` adds the table. Seven tests cover login/
+register return refresh, refresh issues new pair, rotation revokes old
+token, missing/garbage rejected, revoked-after-password-change rejected.
 
 ### TASK-023 — `translator.py` location — DONE
 Moved to `app/integrations/translator.py`. All importers updated
