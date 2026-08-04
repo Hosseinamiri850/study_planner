@@ -29,12 +29,19 @@ def admin_panel():
         tasks = user.tasks.all()
         completed = [task for task in tasks if task.done]
         users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": sum(task.hours for task in completed if task.created_at == today), "week_hours": sum(task.hours for task in completed if task.created_at >= week_start), "total_hours": sum(task.hours for task in completed), "created_at": str(user.created_at)})
-    completed_tasks = Task.query.filter_by(done=True).all()
-    # Single pass over completed tasks: sum hours by completed-day.
+    # System-wide hours-by-day via a single grouped SQL query instead of
+    # loading every completed task and scanning 30 days in Python.
+    rows = (
+        db.session.query(db.func.coalesce(db.func.sum(Task.hours), 0.0).label("hours"))
+        .add_columns(Task.created_at.label("day"))
+        .filter(Task.done.is_(True))
+        .group_by(Task.created_at)
+        .all()
+    )
     hours_by_day = defaultdict(float)
-    for task in completed_tasks:
-        if task.created_at is not None:
-            hours_by_day[task.created_at] += task.hours or 0
+    for row in rows:
+        if row.day is not None:
+            hours_by_day[row.day] += row.hours or 0
     system_week_hours, system_month_hours = {}, {}
     for offset in range(30):
         day = today - timedelta(days=offset)
