@@ -112,13 +112,15 @@ actual logged sessions instead of a one-shot `estimated_hours` field on task
 creation/completion), or stop extending a table nothing uses. This decision
 also blocks TASK-009 (Gamification/streaks) from being built on real data.
 
-### TASK-017 — Move statistics aggregation into SQL
-`services/statistics.py` and `routes/admin.py` compute week/month hours by
-looping over all of a user's or the system's tasks in Python for every day in
-a range. Fine today; won't scale past a small user base, and the admin panel's
-system-wide loop (`Task.query.filter_by(done=True).all()` then scanning 30
-days in Python) is the worst offender. Replace with grouped SQL queries
-(`func.sum`, `group_by(func.date(...))`).
+### TASK-017 — Move statistics aggregation into SQL — DONE
+`services/statistics.py` and `routes/admin.py` now sum hours-by-day via a
+single grouped SQL query (`group_by(Task.created_at)` + `func.sum(Task.hours)`)
+instead of loading every task into Python and scanning 30 days. Result shape
+is unchanged; the admin panel's system-wide loop (the worst offender) no
+longer materializes the full completed-task rowset. The underlying date signal
+is still `created_at` (see TASK-016) — switching to `completed_at`/`StudySession`
+timestamps is a separate correctness decision deferred with the session-tracking
+work.
 
 ### TASK-018 — Pagination — BACKEND DONE (UI DEFERRED)
 `/api/tasks` GET honors `?page` and `?per_page` (both required together;

@@ -3,18 +3,27 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
-from app.models import Course, Major
+from app.extensions import db
+from app.models import Course, Major, Task
 
 
 def get_user_stats(user):
     today = date.today()
     tasks = user.tasks.all()
     completed = [task for task in tasks if task.done]
-    # Single pass: sum done hours by completed-day. O(tasks), not O(days × tasks).
+    # SQL aggregation: one grouped query instead of loading every task and
+    # summing in Python. O(rows in window) regardless of total task count.
+    rows = (
+        db.session.query(db.func.coalesce(db.func.sum(Task.hours), 0.0).label("hours"))
+        .add_columns(Task.created_at.label("day"))
+        .filter(Task.user_id == user.id, Task.done.is_(True))
+        .group_by(Task.created_at)
+        .all()
+    )
     hours_by_day = defaultdict(float)
-    for task in completed:
-        if task.created_at is not None:
-            hours_by_day[task.created_at] += task.hours or 0
+    for row in rows:
+        if row.day is not None:
+            hours_by_day[row.day] += row.hours or 0
     week_hours = {str(today - timedelta(days=offset)): hours_by_day[today - timedelta(days=offset)] for offset in range(7)}
     month_hours = {
         str(day): hours
