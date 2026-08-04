@@ -104,11 +104,22 @@ class _LoggingTestConfig:
 
 
 class TestInitSentry:
-    def test_no_dsn_is_noop(self, app):
+    def test_no_dsn_is_noop(self, app, monkeypatch):
         # No SENTRY_DSN → init_sentry returns without touching the SDK.
-        init_sentry(app)  # should not raise even though sentry_sdk is absent
+        # Stub the SDK so the test never hits the real package (which may be
+        # installed in CI).
+        import sys
+        from unittest.mock import MagicMock
+        sdk = MagicMock()
+        monkeypatch.setitem(sys.modules, "sentry_sdk", sdk)
+        app.config["SENTRY_DSN"] = ""
+        init_sentry(app)
+        sdk.init.assert_not_called()
 
-    def test_dsn_without_sdk_logs_warning(self, app, caplog):
+    def test_dsn_without_sdk_logs_warning(self, app, monkeypatch, caplog):
+        # SDK not importable → init_sentry warns and skips init.
+        import sys
+        monkeypatch.setitem(sys.modules, "sentry_sdk", None)
         app.config["SENTRY_DSN"] = "https://example@sentry.invalid/1"
         with caplog.at_level(logging.WARNING):
             init_sentry(app)
