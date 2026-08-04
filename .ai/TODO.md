@@ -99,12 +99,12 @@ at 5/min per IP via Flask-Limiter (`app/extensions.py`, initialized in
 `create_app`). Storage: Redis when `RATELIMIT_STORAGE_URI` is set, in-memory
 otherwise. Tests in `tests/test_rate_limiting.py`.
 
-### TASK-015 — Test coverage for browser routes
-Add `tests/test_routes_web.py` and `tests/test_routes_admin.py` covering
-login/register/logout, dashboard task CRUD, theme toggle, language switch,
-and the admin panel actions (delete user, change password, add/delete
-major/course). This is the actual product surface today; it's currently the
-least-tested part of the app.
+### TASK-015 — Test coverage for browser routes — DONE
+`tests/test_routes_web.py` covers login/register/logout, dashboard task
+CRUD, theme toggle, language switch, and view_user. `tests/test_routes_admin.py`
+covers admin access control, user deletion, password change, major/course
+CRUD, and the delete_course task-preservation behavior. This is the actual
+product surface today; it's now as well-tested as the rest of the app.
 
 ### TASK-016 — Decide the fate of StudySession
 Either wire up real start/stop session tracking (so "hours studied" reflects
