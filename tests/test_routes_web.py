@@ -7,7 +7,7 @@ without a token.
 
 
 from app.extensions import db
-from app.models import Task, User
+from app.models import StudySession, Task, User
 
 
 class TestAuthViews:
@@ -221,6 +221,66 @@ class TestDashboard:
         assert fresh.priority == "high"
         assert fresh.estimated_hours == 3.5
 
+    def test_dashboard_starts_session(self, client, create_user, create_task):
+        owner = create_user(username="starter")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "starter"
+        assert StudySession.query.filter_by(task_id=task.id, ended_at=None).first() is None
+        r = client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        assert r.status_code == 302
+        assert StudySession.query.filter_by(task_id=task.id, ended_at=None).first() is not None
+
+    def test_dashboard_rejects_duplicate_open_session(self, client, create_user, create_task):
+        owner = create_user(username="duper")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "duper"
+        client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        # Second start must not create a second open session.
+        client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        assert StudySession.query.filter_by(task_id=task.id, ended_at=None).count() == 1
+
+    def test_dashboard_stops_session(self, client, create_user, create_task):
+        owner = create_user(username="stopper")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "stopper"
+        client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        r = client.post("/dashboard", data={"action": "stop_session", "task_id": task.id})
+        assert r.status_code == 302
+        session = StudySession.query.filter_by(task_id=task.id).first()
+        assert session.ended_at is not None
+        assert session.duration is not None
+
+    def test_dashboard_stop_without_active_session_noop(self, client, create_user, create_task):
+        owner = create_user(username="lonelystopper")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "lonelystopper"
+        client.post("/dashboard", data={"action": "stop_session", "task_id": task.id})
+        # No session was created.
+        assert StudySession.query.filter_by(task_id=task.id).count() == 0
+
+    def test_dashboard_session_actions_reject_other_users_task(self, client, create_user, create_task):
+        owner = create_user(username="ownsS")
+        create_user(username="sneaks")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "sneaks"
+        client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        assert StudySession.query.filter_by(task_id=task.id).count() == 0
+
+    def test_dashboard_renders_session_buttons(self, client, create_user, create_task):
+        owner = create_user(username="withbuttons")
+        task = create_task(user=owner)
+        with client.session_transaction() as sess:
+            sess["username"] = "withbuttons"
+        html = client.get("/dashboard").get_data(as_text=True)
+        assert "start_session" in html  # start button shown for a task with no open session
+        client.post("/dashboard", data={"action": "start_session", "task_id": task.id})
+        html = client.get("/dashboard").get_data(as_text=True)
+        assert "stop_session" in html  # stop button shown once a session is running
 
 class TestViewUser:
     def test_view_user_requires_login(self, client, create_user):

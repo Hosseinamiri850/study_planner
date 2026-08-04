@@ -1,5 +1,8 @@
 
 
+from app.extensions import db
+
+
 class TestAuthAPI:
     def test_register_success(self, client):
         response = client.post("/api/auth/register", json={
@@ -90,6 +93,26 @@ class TestTasksAPI:
         data = client.get("/api/tasks?page=1&per_page=9999").get_json()
         assert data["per_page"] == 100
         assert len(data["tasks"]) == 2
+
+    def test_list_tasks_rejects_page_without_per_page(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=1")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_per_page_without_page(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?per_page=10")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_page_below_one(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=0&per_page=10")
+        assert response.status_code == 400
+
+    def test_list_tasks_rejects_per_page_below_one(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/tasks?page=1&per_page=0")
+        assert response.status_code == 400
 
     def test_create_task_success(self, auth_client, create_course):
         client, user = auth_client
@@ -188,3 +211,114 @@ class TestTranslateAPI:
     def test_translate_requires_auth(self, client):
         response = client.post("/api/translate", json={"text": "test"})
         assert response.status_code in (302, 400, 401)
+
+
+class TestSessionsAPI:
+    def test_start_session_success(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        response = client.post(f"/api/tasks/{task.id}/sessions")
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["session"]["is_open"] is True
+        assert data["session"]["task_id"] == task.id
+        assert data["session"]["duration"] is None  # open → unknown duration
+
+    def test_start_session_rejects_duplicate_open(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        client.post(f"/api/tasks/{task.id}/sessions")
+        r = client.post(f"/api/tasks/{task.id}/sessions")
+        assert r.status_code == 409
+
+    def test_start_session_unknown_task(self, auth_client):
+        client, user = auth_client
+        r = client.post("/api/tasks/99999/sessions")
+        assert r.status_code == 404
+
+    def test_start_session_other_user_task(self, auth_client, create_user, create_task):
+        client, user = auth_client
+        other = create_user(username="other_session", password="pass123")
+        task = create_task(user=other)
+        r = client.post(f"/api/tasks/{task.id}/sessions")
+        assert r.status_code == 404  # not the caller's task
+
+    def test_stop_session_sets_duration(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        start = client.post(f"/api/tasks/{task.id}/sessions").get_json()["session"]
+        r = client.post(f"/api/tasks/{task.id}/sessions/{start['id']}/stop")
+        assert r.status_code == 200
+        data = r.get_json()["session"]
+        assert data["is_open"] is False
+        assert data["ended_at"] is not None
+        assert data["duration"] is not None and data["duration"] >= 0
+
+    def test_stop_session_idempotent(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        start = client.post(f"/api/tasks/{task.id}/sessions").get_json()["session"]
+        first = client.post(f"/api/tasks/{task.id}/sessions/{start['id']}/stop")
+        assert first.status_code == 200
+        second = client.post(f"/api/tasks/{task.id}/sessions/{start['id']}/stop")
+        assert second.status_code == 200
+        assert second.get_json()["session"]["duration"] == first.get_json()["session"]["duration"]
+
+    def test_stop_unknown_session(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        r = client.post(f"/api/tasks/{task.id}/sessions/99999/stop")
+        assert r.status_code == 404
+
+    def test_list_sessions(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        s1 = client.post(f"/api/tasks/{task.id}/sessions").get_json()["session"]
+        client.post(f"/api/tasks/{task.id}/sessions/{s1['id']}/stop")
+        client.post(f"/api/tasks/{task.id}/sessions")
+        data = client.get(f"/api/tasks/{task.id}/sessions").get_json()
+        assert len(data["sessions"]) == 2
+        assert data["sessions"][0]["is_open"] is True  # desc order → newest first
+
+
+class TestRefreshTokens:
+    def test_login_returns_refresh_token(self, client, create_user):
+        create_user(username="rtuser", password="testpass123")
+        response = client.post("/api/auth/login", json={"username": "rtuser", "password": "testpass123"})
+        data = response.get_json()
+        assert "refresh_token" in data and data["refresh_token"]
+
+    def test_register_returns_refresh_token(self, client):
+        response = client.post("/api/auth/register", json={
+            "username": "rtreg", "password": "securepass123", "fullname": "RT Reg",
+        })
+        assert "refresh_token" in response.get_json()
+
+    def test_refresh_issues_new_pair(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        response = client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        assert response.status_code == 200
+        new = response.get_json()
+        assert "access_token" in new and "refresh_token" in new
+
+    def test_refresh_rotates_old_token(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        replay = client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        assert replay.status_code == 401  # old token revoked by rotation
+
+    def test_refresh_rejects_missing_token(self, client):
+        assert client.post("/api/auth/refresh", json={}).status_code == 400
+
+    def test_refresh_rejects_garbage(self, client):
+        assert client.post("/api/auth/refresh", json={"refresh_token": "not-a-token"}).status_code == 401
+
+    def test_refresh_rejects_revoked_after_password_change(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        from werkzeug.security import generate_password_hash
+
+        from app.models.refresh_token import revoke_user_refresh_tokens
+        user.password = generate_password_hash("newpass123")
+        revoke_user_refresh_tokens(user.id)
+        db.session.commit()
+        assert client.post("/api/auth/refresh", json={"refresh_token": refresh}).status_code == 401
