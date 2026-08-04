@@ -74,30 +74,22 @@ Automatic schedule generation. Not started.
 
 ## P0 — blocks a real first deploy
 
-### TASK-011 — Admin account bootstrap
-There is currently **no way to create an admin user**: `seed-reference-data`
-deliberately creates none (correct call — don't reverse it), and no CLI
-command or promote-route exists to replace it. `README.md` claims an "audited
-deployment/admin process" that doesn't actually exist in code.
-Fix: add a `flask --app app create-admin <username>` CLI command (prompts
-for password, hashes it, sets `is_admin=True`), document it, and update the
-README sections that still describe the old `admin`/`admin` auto-seed.
+### TASK-011 — Admin account bootstrap — DONE
+`flask --app app create-admin <username>` CLI command added (prompts for
+password, hashes it, `is_admin=True`). `--promote` flag grants admin role
+to an existing user. `seed-reference-data` still creates no admin (correct).
+README updated to document the command. Tested in `tests/test_cli.py`.
 
-### TASK-012 — Fix `translator_available()` on every page render
-`inject_i18n` (a global `context_processor`, runs on every request) calls
-`translator_available()`, which does a live blocking HTTP GET to
-LibreTranslate with a timeout. If LibreTranslate is down or unset, every page
-load pays that latency. Fix: cache the result with a short TTL (e.g. 30–60s)
-or check it asynchronously from the frontend instead of blocking the render.
+### TASK-012 — Fix `translator_available()` on every page render — DONE
+`inject_i18n` context processor now calls `is_available_cached()` (60s TTL)
+instead of the blocking `is_available()`. `/api/translator-status` still
+uses the live check. `reset_availability_cache()` provided for tests.
 
-### TASK-013 — README accuracy pass
-The architecture note at the top of `README.md` is accurate; the Persian and
-English "Quick Start" sections further down still describe the old
-auto-create-tables / auto-seed-`admin`/`admin` behavior. Also: README claims
-bcrypt, code uses Werkzeug's default hasher — fix the doc or switch the
-implementation, don't leave the mismatch. Rewrite Quick Start to match the
-current migration-based flow, including the new `create-admin` command from
-TASK-011.
+### TASK-013 — README accuracy pass — DONE
+README Quick Start (Persian + English) describes the migration-based flow,
+`create-admin` command, and the intentional absence of auto-table-creation
+and `admin`/`admin` seed. The bcrypt claim is removed — code uses Werkzeug's
+default hasher (scrypt).
 
 ## P1 — needed before real users / before scaling past a handful of people
 
