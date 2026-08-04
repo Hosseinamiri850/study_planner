@@ -167,9 +167,12 @@ Moved to `app/integrations/translator.py`. All importers updated
 (api.py, utils/i18n.py, tests). .dockerignore updated. STRUCTURE.md,
 CLI docs, and README references point to the new path.
 
-### TASK-024 — Backups
-No documented backup strategy for the PostgreSQL database. Needs one before
-any deployment holds real user data.
+### TASK-024 — Backups — DONE
+`scripts/backup.sh` dumps the PostgreSQL DB to a timestamped file and prunes
+dumps older than `BACKUP_RETENTION_DAYS` (default 14). Reads `DATABASE_URL`
+or individual `PG*` vars; gzips by default; safe for cron. README documents
+usage + cron example. No secrets in the script — connection details come from
+env. Restore verification is still the operator's responsibility (documented).
 
 ---
 
