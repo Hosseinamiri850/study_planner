@@ -180,3 +180,95 @@ env. Restore verification is still the operator's responsibility (documented).
 
 ## TASK-009 — Gamification (see above, blocked on TASK-016)
 ## TASK-010 — Smart Planner (see above)
+
+---
+
+# Planned — production hardening, phase 2 + UI migration
+
+The items below are the next wave. They are ordered: backend/production first,
+then the React/Next.js UI migration. See `.ai/ROADMAP.md` for the phased plan
+and `.ai/PLAN_REACT_MIGRATION.md` for the frontend migration design.
+
+## P4 — Backend production hardening (priority 1)
+
+### TASK-025 — Redis caching layer before the database
+Add a Redis cache between read paths and PostgreSQL so hot queries (course list,
+major list, statistics dashboard, translator availability) stop hitting the DB
+on every request. `docker-compose.yml` already ships a Redis service; wire it
+up as a cache. Use a thin wrapper (no heavy framework) with TTLs and explicit
+invalidation keys on writes. Requirements: `redis>=5.0` (async optional later).
+Tasks:
+- Add `app/extensions.py` a shared `cache` client bound to `REDIS_URL`.
+- Add `app/utils/caching.py` with `cached(key, ttl)` decorator + `invalidate(key)`.
+- Cache `all_courses_list()`, `majors_for_template()`, `is_available_cached()`
+  (move the ad-hoc TTL cache onto Redis), and the per-user statistics payload.
+- Invalidate on admin major/course create/delete and on task writes.
+- Tests: cache miss/hit, invalidation, and TTL expiry.
+
+### TASK-026 — REST API gaps for an SPA client
+The `/api/*` surface is usable today but missing endpoints a React/Next.js
+client needs. Add:
+- `GET /api/me` — current user profile (id, username, fullname, theme, is_admin).
+- `PUT /api/me` — update profile (fullname, theme; password change with current
+  password verification).
+- `GET /api/courses`, `GET /api/majors` — read-only list endpoints (admin needs
+  write variants: `POST/PUT/DELETE /api/courses`, `/api/majors` guarded by
+  `is_admin`).
+- `POST /api/auth/logout` — revoke the presented refresh token (single-session
+  logout; `revoke_user_refresh_tokens` is the logout-everywhere hammer).
+- Pagination on list endpoints beyond tasks (courses, sessions) where useful.
+- Tests for every new route, mirroring `TestAuthAPI` / `TestTasksAPI`.
+
+### TASK-027 — Stats correctness: StudySession as the hours signal
+Move statistics from `Task.created_at` + `Task.hours` to `StudySession.started_at`
++ `StudySession.duration`. Now that sessions are wired (TASK-016), the Python
+`sum(task.hours)` loops measure the wrong date and double-count. Replace with
+SQL aggregation over `study_sessions` joined to the user's tasks:
+`COALESCE(SUM(study_sessions.duration), 0)` grouped by date. Update
+`services/statistics.py`, `routes/admin.py`, `/api/statistics/dashboard`, and
+the dashboard/admin templates to read from the new numbers. Keep a fallback
+to legacy `Task.hours` while backfilling, if needed, behind a config flag.
+Decide on backfill: existing rows have `duration` but no `started_at` session
+rows, so either keep legacy fallback for pre-cutover data or accept a one-time
+reset of historical hours.
+
+### TASK-028 — Health/readiness endpoints
+Add `GET /healthz` (liveness, no DB check, always 200 if process is up) and
+`GET /readyz` (readiness, runs `SELECT 1` against PostgreSQL, 503 on failure).
+Both exempt from auth and CSRF. Needed for container orchestrators and
+load balancers behind the Docker deployment.
+
+### TASK-029 — Security headers + cookie hardening
+Explicit security headers (`Strict-Transport-Security`, `Content-Security-Policy`,
+`X-Content-Type-Options`, `Referrer-Policy`) via an `after_request` hook or
+`flask-talisman`. Lock the session cookie: `SESSION_COOKIE_SECURE=True`,
+`SESSION_COOKIE_HTTPONLY=True`, `SESSION_COOKIE_SAMESITE=Lax` in production
+config. Set a sane `PERMANENT_SESSION_LIFETIME`. CSP must allow Bootstrap,
+Chart.js, and the inline scripts the templates currently use — start permissive
+and tighten after the UI migration.
+
+### TASK-030 — Docker migration runner safety
+The Dockerfile runs `flask db upgrade` before gunicorn. Under multiple replicas
+this races. Options: (a) a one-shot init container that runs migrations and
+exits before app containers start, (b) a distributed lock around the upgrade
+on boot. Document the chosen approach in README + STRUCTURE.md. Low risk at
+current single-replica deploy, but must be decided before scaling.
+
+### TASK-031 — CI quality uplift
+- Expand matrix to Python 3.12 AND 3.13 (pyproject targets 3.12; CI only runs
+  3.13 today).
+- Add `pytest --cov` + a minimum coverage gate (start low, raise over time).
+- Add `ruff format --check` step if formatting is adopted.
+- Run the suite with SQLite (current) AND PostgreSQL service container so
+  migration/tz behavior is exercised against the real DB.
+
+## P5 — UI/UX migration (priority 2, after P4)
+
+### TASK-032 — Next.js + shadcn/ui frontend, phase 1 (proof of concept)
+Introduce a `frontend/` directory with a Next.js 15 (App Router) client using
+TypeScript, Tailwind CSS, and shadcn/ui. Phase 1 scope: a working dashboard
+route that lists tasks from `/api/tasks` and can create/toggle/delete one.
+This proves the API contract, auth flow, RTL/i18n, and shadcn setup before
+migrating everything. Do NOT remove the Jinja templates yet — both UIs run
+in parallel behind a route prefix during the migration. See
+`.ai/PLAN_REACT_MIGRATION.md` for the full phased design.
