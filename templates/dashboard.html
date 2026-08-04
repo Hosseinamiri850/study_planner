@@ -702,6 +702,19 @@
                                                 <i class="bi bi-check-lg"></i>
                                             </button>
                                         </form>
+                                        {% if task.active_session %}
+                                        <form method="POST" class="d-inline" title="Session active — stop">
+                                            <button name="action" value="stop_session" class="btn-action btn-stop-session"><input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <i class="bi bi-stop-circle"></i> {{ task.active_session.started_at }}
+                                            </button>
+                                        </form>
+                                        {% else %}
+                                        <form method="POST" class="d-inline" title="Start study session">
+                                            <button name="action" value="start_session" class="btn-action btn-start-session"><input type="hidden" name="task_id" value="{{ task.id }}">
+                                                <i class="bi bi-play-circle"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>

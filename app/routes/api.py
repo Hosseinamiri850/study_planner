@@ -5,9 +5,15 @@ from app.config import Config
 from app.extensions import csrf, db, limiter
 from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
-from app.models import Course, Task, User
+from app.models import Course, StudySession, Task, User
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
-from app.utils.auth import api_auth_required, create_access_token, login_required
+from app.utils.auth import (
+    api_auth_required,
+    create_access_token,
+    issue_refresh_token,
+    login_required,
+    rotate_refresh_token,
+)
 from app.utils.validation import positive_hours, valid_password, valid_priority, valid_username
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
@@ -56,7 +62,7 @@ def register():
     user = User(username=username, password=generate_password_hash(password), fullname=fullname)
     db.session.add(user)
     db.session.commit()
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user)}), 201
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)}), 201
 
 
 @api_bp.route("/auth/login", methods=["POST"])
@@ -67,7 +73,27 @@ def login():
     user = User.query.filter_by(username=str(data.get("username", "")).strip()).first()
     if not user or not check_password_hash(user.password, str(data.get("password", ""))):
         return _error("Invalid username or password.", 401)
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user)})
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)})
+
+
+@api_bp.route("/auth/refresh", methods=["POST"])
+@csrf.exempt
+@limiter.limit(Config.RATELIMIT_AUTH)
+def refresh():
+    """Exchange a valid refresh token for a fresh access + refresh pair.
+
+    Rotation: the presented refresh token is revoked; the response contains
+    a new refresh token. Clients must replace their stored refresh token.
+    """
+    data = request.get_json(silent=True) or {}
+    signed = str(data.get("refresh_token", "")).strip()
+    if not signed:
+        return _error("refresh_token is required.", 400)
+    user, access, refresh_tok = rotate_refresh_token(signed)
+    if user is None:
+        return _error("Invalid or expired refresh token.", 401)
+    db.session.commit()
+    return jsonify({"access_token": access, "refresh_token": refresh_tok})
 
 
 @api_bp.route("/tasks", methods=["GET"])
@@ -76,15 +102,23 @@ def list_tasks():
     query = Task.query.filter_by(user_id=g.api_user.id).order_by(Task.created_at.desc(), Task.id.desc())
     page = request.args.get("page", type=int)
     per_page = request.args.get("per_page", type=int)
-    # Backward-compat: no params → return everything, as before.
-    if page and per_page:
-        page = max(page, 1)
-        per_page = max(min(per_page, 100), 1)
+    # If either pagination param is set, both must be set; otherwise fall back
+    # to the legacy "return everything" shape for backward compatibility.
+    has_page = request.args.get("page") is not None
+    has_per_page = request.args.get("per_page") is not None
+    if has_page != has_per_page:
+        return _error("page and per_page must be provided together.")
+    if has_page and has_per_page:
+        if page < 1:
+            return _error("page must be >= 1.")
+        if per_page < 1:
+            return _error("per_page must be >= 1.")
+        per_page = min(per_page, 100)
+        # Flask-SQLAlchemy paginate() emits LIMIT/OFFSET at the SQL layer,
+        # so we never materialise the whole rowset into memory.
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
-        tasks = pagination.items
-        return jsonify({"tasks": [_task_payload(task) for task in tasks], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
-    tasks = query.all()
-    return jsonify({"tasks": [_task_payload(task) for task in tasks]})
+        return jsonify({"tasks": [_task_payload(task) for task in pagination.items], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
+    return jsonify({"tasks": [_task_payload(task) for task in query.all()]})
 
 
 @api_bp.route("/tasks", methods=["POST"])
@@ -145,6 +179,65 @@ def delete_task(task_id):
     db.session.delete(task)
     db.session.commit()
     return "", 204
+
+
+def _session_payload(session):
+    return {
+        "id": session.id,
+        "task_id": session.task_id,
+        "started_at": session.started_at.isoformat() if session.started_at else None,
+        "ended_at": session.ended_at.isoformat() if session.ended_at else None,
+        "duration": session.duration,
+        "is_open": session.is_open,
+    }
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions", methods=["POST"])
+@csrf.exempt
+@api_auth_required
+def start_session(task_id):
+    """Open a new study session for a task owned by the caller.
+
+    Returns 409 if there is already an open session for that task — clients
+    must stop the existing one before starting another.
+    """
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    if task.active_session is not None:
+        return _error("A session is already open for this task.", 409)
+    session = task.start_session()
+    db.session.commit()
+    return jsonify({"session": _session_payload(session)}), 201
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions/<int:session_id>/stop", methods=["POST"])
+@csrf.exempt
+@api_auth_required
+def stop_session(task_id, session_id):
+    """Close an open study session owned by the caller. Idempotent: stopping
+    an already-closed session returns 200 with the persisted duration.
+    """
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    session = db.session.get(StudySession, session_id)
+    if not session or session.task_id != task_id:
+        return _error("Session not found.", 404)
+    if session.is_open:
+        session.stop()
+        db.session.commit()
+    return jsonify({"session": _session_payload(session)})
+
+
+@api_bp.route("/tasks/<int:task_id>/sessions", methods=["GET"])
+@api_auth_required
+def list_sessions(task_id):
+    task = db.session.get(Task, task_id)
+    if not task or task.user_id != g.api_user.id:
+        return _error("Task not found.", 404)
+    sessions = task.study_sessions.order_by(StudySession.started_at.desc()).all()
+    return jsonify({"sessions": [_session_payload(s) for s in sessions]})
 
 
 @api_bp.route("/statistics/dashboard", methods=["GET"])
