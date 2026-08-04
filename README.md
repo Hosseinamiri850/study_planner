@@ -438,6 +438,29 @@ with pre-migration data. |
 
 ---
 
+## 🗃️ Database backups
+
+`scripts/backup.sh` dumps the configured PostgreSQL database to a timestamped
+file and prunes dumps older than `BACKUP_RETENTION_DAYS` (default 14). It is
+safe to run repeatedly and designed for cron.
+
+```bash
+# One-off (reads DATABASE_URL or PG* env vars):
+DATABASE_URL=postgresql://user:pass@localhost:5432/study_planner \
+  BACKUP_DIR=/var/backups/study_planner \
+  ./scripts/backup.sh
+
+# Cron — daily 03:17, 14-day retention:
+17 3 * * * DATABASE_URL=... BACKUP_DIR=/var/backups/study_planner \
+  /path/to/study_planner/scripts/backup.sh >> /var/log/study_planner_backup.log 2>&1
+```
+
+Only one of `DATABASE_URL` or the individual `PGHOST`/`PGPORT`/`PGUSER`/
+`PGDATABASE` variables is required. Set `GZIP=0` to skip gzip. Verify
+restores on a throwaway database before relying on this for production.
+
+---
+
 <div dir="rtl">
 
 ## 📁 ساختار پروژه
