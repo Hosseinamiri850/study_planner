@@ -154,3 +154,13 @@ def auth_client(client, create_user):
     token = response.get_json()["access_token"]
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
     return client, user
+
+
+@pytest.fixture
+def login_tokens(client, create_user):
+    """Log in a user and return (user, access_token, refresh_token)."""
+    user = create_user(username="refreshuser", password="testpass123")
+    response = client.post("/api/auth/login", json={"username": user.username, "password": "testpass123"})
+    assert response.status_code == 200, f"Login failed: {response.get_json()}"
+    data = response.get_json()
+    return user, data["access_token"], data["refresh_token"]

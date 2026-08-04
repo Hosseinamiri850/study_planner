@@ -70,3 +70,27 @@ def configure_logging(app):
 
     # Quiet Flask's noisy request logger unless debugging; errors still surface via werkzeug.
     logging.getLogger("werkzeug").setLevel(logging.WARNING if not app.config.get("DEBUG") else logging.INFO)
+
+
+def init_sentry(app):
+    """Initialize Sentry SDK if `SENTRY_DSN` is set and the SDK is installed.
+
+    No-op otherwise — Sentry is an optional dependency. The Flask integration
+    auto-instruments requests, so unhandled exceptions are reported without any
+    per-route wiring. Call once from create_app, after configure_logging so
+    the SDK picks up the JSON log handler as a breadcrumb source.
+    """
+    dsn = app.config.get("SENTRY_DSN")
+    if not dsn:
+        return
+    try:
+        import sentry_sdk
+    except ImportError:
+        app.logger.warning("SENTRY_DSN set but sentry-sdk not installed; skipping Sentry init.")
+        return
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=app.config.get("SENTRY_ENVIRONMENT", "production"),
+        traces_sample_rate=app.config.get("SENTRY_TRACES_SAMPLE_RATE", 0.0),
+        send_default_pii=False,
+    )

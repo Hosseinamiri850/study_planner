@@ -20,3 +20,7 @@ class Config:
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
     # Auth endpoints are brute-force targets — allow 5 attempts per minute.
     RATELIMIT_AUTH = "5 per minute"
+    # Sentry is optional: blank DSN → SDK never initializes. Set via env in prod.
+    SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+    SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "production")
+    SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0"))

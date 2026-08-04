@@ -1,5 +1,8 @@
 
 
+from app.extensions import db
+
+
 class TestAuthAPI:
     def test_register_success(self, client):
         response = client.post("/api/auth/register", json={
@@ -276,3 +279,45 @@ class TestSessionsAPI:
         data = client.get(f"/api/tasks/{task.id}/sessions").get_json()
         assert len(data["sessions"]) == 2
         assert data["sessions"][0]["is_open"] is True  # desc order → newest first
+
+
+class TestRefreshTokens:
+    def test_login_returns_refresh_token(self, client, create_user):
+        create_user(username="rtuser", password="testpass123")
+        response = client.post("/api/auth/login", json={"username": "rtuser", "password": "testpass123"})
+        data = response.get_json()
+        assert "refresh_token" in data and data["refresh_token"]
+
+    def test_register_returns_refresh_token(self, client):
+        response = client.post("/api/auth/register", json={
+            "username": "rtreg", "password": "securepass123", "fullname": "RT Reg",
+        })
+        assert "refresh_token" in response.get_json()
+
+    def test_refresh_issues_new_pair(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        response = client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        assert response.status_code == 200
+        new = response.get_json()
+        assert "access_token" in new and "refresh_token" in new
+
+    def test_refresh_rotates_old_token(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        replay = client.post("/api/auth/refresh", json={"refresh_token": refresh})
+        assert replay.status_code == 401  # old token revoked by rotation
+
+    def test_refresh_rejects_missing_token(self, client):
+        assert client.post("/api/auth/refresh", json={}).status_code == 400
+
+    def test_refresh_rejects_garbage(self, client):
+        assert client.post("/api/auth/refresh", json={"refresh_token": "not-a-token"}).status_code == 401
+
+    def test_refresh_rejects_revoked_after_password_change(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        from werkzeug.security import generate_password_hash
+        from app.models.refresh_token import revoke_user_refresh_tokens
+        user.password = generate_password_hash("newpass123")
+        revoke_user_refresh_tokens(user.id)
+        db.session.commit()
+        assert client.post("/api/auth/refresh", json={"refresh_token": refresh}).status_code == 401
