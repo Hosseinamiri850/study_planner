@@ -316,6 +316,7 @@ class TestRefreshTokens:
     def test_refresh_rejects_revoked_after_password_change(self, client, login_tokens):
         user, access, refresh = login_tokens
         from werkzeug.security import generate_password_hash
+
         from app.models.refresh_token import revoke_user_refresh_tokens
         user.password = generate_password_hash("newpass123")
         revoke_user_refresh_tokens(user.id)
