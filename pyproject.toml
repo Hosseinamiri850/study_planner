@@ -1,0 +1,30 @@
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+# Pointed checks:
+#  F   = pyflakes (unused imports/vars, undefined names) — real bugs.
+#  E,W = pycodestyle warnings/errors — line-length low-noise at line-length=120.
+#  I   = import sorting — keeps diffs clean (held an assortment in the fixtures).
+#  UP  = upgrade typing/modern syntax abstractly.
+select = ["F", "E", "W", "I", "UP"]
+ignore = [
+  # Codebase intentionally uses tersely-wrapped lines; length handled above by
+  # line-length, but a few genuinely long template strings remain — ignore.
+  "E501",
+  # Tersely chained single-line if/elif is the established house style in this
+  # repo (see web.py, admin.py). Do not gate CI on it.
+  "E701",
+  # blanket except in translator.translate/is_available wraps network calls
+  # onto a None return on purpose.
+  "BLE001",
+  # date.today()/datetime.utcnow() deprecation — a pre-existing project-wide
+  # issue tracked separately in TASK (utcnow migration); do not gate CI on it.
+  "DTZ001", "DTZ003", "DTZ011",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"translator.py" = ["UP"]  # keep explicit `str | None` to match existing style
+"tests/*" = ["E", "W"]     # tests tolerate style nits
+"migrations/*" = ["E", "W", "F401"]  # Alembic generates unconventional imports

@@ -1,11 +1,11 @@
 # Study Planner Project Structure
 
-_Last reviewed against the actual `trunk` codebase — see .ai/TODO.md for what's
-still open._
+_Last reviewed 2026-08-10 against the actual codebase. See `.ai/TODO.md` for
+what's still open and `.ai/ROADMAP.md` for the phased plan._
 
 ## Overview
 
-Study Planner is a Flask-based productivity application designed to help users
+Study Planner is a Flask-based productivity application that helps users
 manage courses, tasks, and study progress.
 
 Current stack:
@@ -20,56 +20,82 @@ Database:
 - PostgreSQL 14+
 
 Frontend:
-- Server-rendered Jinja templates
+- Server-rendered Jinja templates (production UI today)
 - Bootstrap 5
 - Vanilla JavaScript (no build step)
+- _Target: Next.js 15 + TypeScript + Tailwind + shadcn/ui — see
+  `.ai/PLAN_REACT_MIGRATION.md`_
 
 Visualization:
-- Chart.js
+- Chart.js (replaced by recharts/shadcn in the React UI)
 
 Translation:
-- LibreTranslate (self-hosted or public instance), integrated via `translator.py`
+- LibreTranslate (self-hosted or public instance), integrated via
+  `app/integrations/translator.py`
+
+i18n:
+- Custom JSON locale system (`locales/fa.json`, `locales/en.json`), RTL/LTR
+
+Deployment:
+- Docker (app + PostgreSQL 16 + Redis), `docker-compose.yml`
+- Gunicorn in prod; `scripts/backup.sh` for pg_dump + retention
 
 ---
 
-# Current Architecture — P0 refactor is DONE
+## Current Architecture — P0 refactor is DONE
 
-The target architecture described below is no longer aspirational; it's what's
-in `trunk` today.
+The target architecture described below is what's in `trunk` today.
 
 ```
 app/
   __init__.py     Application factory (create_app). No table creation at startup.
   config.py       Environment-only configuration (.env for local dev).
-  extensions.py   db, migrate, csrf (Flask-SQLAlchemy, Flask-Migrate, Flask-WTF CSRFProtect).
+  extensions.py   db, migrate, csrf, limiter (Flask-SQLAlchemy, Flask-Migrate,
+                  Flask-WTF CSRFProtect, Flask-Limiter).
   models/
     user.py       User
     course.py     Major, Course
     task.py       Task, StudySession
   routes/
-    web.py        Browser routes, session-cookie auth: /, /login, /register, /logout,
-                   /dashboard, /user/<username>, /toggle-theme, /set-lang.
+    web.py        Browser routes, session-cookie auth: /, /login, /register,
+                  /logout, /dashboard, /user/<username>, /toggle-theme,
+                  /set-lang.
     admin.py       Browser routes, session + is_admin: /admin.
     api.py         JSON routes, Bearer-token auth: /api/auth/*, /api/tasks*,
-                   /api/statistics/dashboard, /api/translate.
+                   /api/tasks/<id>/sessions*, /api/statistics/dashboard,
+                   /api/translate, /api/translator-status.
   services/
-    seed.py        Explicit reference-data seeding (majors/courses only — see
-                   note below, no admin account is created here).
+    seed.py        Explicit reference-data seeding (majors/courses only — no
+                   admin account created here).
     statistics.py  Read-model helpers for dashboard/admin stats.
   utils/
     auth.py        current_user(), login_required, admin_required,
-                   api_auth_required, create_access_token.
-    i18n.py        JSON-locale loader + `t()` translation helper + context processor.
+                   api_auth_required, create_access_token,
+                   issue_refresh_token, rotate_refresh_token.
+    i18n.py        JSON-locale loader + `t()` translation helper + context
+                   processor.
     validation.py  Dependency-free input validators.
+    logging.py     JsonFormatter + configure_logging + init_sentry (no-op
+                   without SENTRY_DSN).
+  integrations/
+    translator.py   LibreTranslate client (translate, auto-translate,
+                    availability cache).
 migrations/
   versions/
-    20260723_01_initial_schema.py       Legacy table shapes.
-    20260723_02_task_study_sessions.py  Task.status/estimated_hours/course_id,
-                                         StudySession table, completion metadata.
-translator.py      LibreTranslate client. Still at repo root, not under app/ —
-                   see TODO TASK-011.
-tests/             pytest suite, 72 tests: models, services, utils, api routes.
-                   No tests yet for web.py / admin.py (the actual browser UI).
+    20260723_01_initial_schema.py         Legacy table shapes.
+    20260723_02_task_study_sessions.py    Task.status/estimated_hours/course_id,
+                                           StudySession table, completion
+                                           metadata.
+    20260804_01_session_duration_nullable Session.duration nullable.
+    20260804_02_refresh_tokens.py         RefreshToken table (jti revocation).
+tests/             pytest suite: 191 tests — models, services, utils,
+                   integrations, api/web/admin routes, CLI commands, rate
+                   limiting, refresh-token rotation, Sentry init.
+locales/           fa.json, en.json — source of truth for UI strings.
+templates/         Jinja templates (dashboard.html 1039 lines, admin.html 598).
+scripts/           backup.sh — pg_dump + gzip + retention prune.
+Dockerfile, docker-compose.yml, .dockerignore  — app + Postgres + Redis compose.
+.github/workflows/ci.yml  — ruff check + pytest on Python 3.13.
 ```
 
 Design principles (still the goal, mostly achieved):
@@ -79,10 +105,10 @@ Design principles (still the goal, mostly achieved):
    is a multi-branch dispatcher that's grown past "one responsibility" and is
    a reasonable next target for a small refactor.
 3. Explicit dependencies — done; config is env-only, no hidden globals besides
-   the shared `db`/`csrf`/`migrate` extension instances (which is the normal
+   the shared `db`/`csrf`/`migrate`/`limiter` extension instances (normal
    Flask pattern).
-4. Testable components — partially done; API/model/service layers are tested,
-   browser routes are not.
+4. Testable components — done: API, model, service, and browser-route
+   layers all tested (TASK-015).
 5. API readiness — done; `/api/*` exists and is usable by a future SPA/mobile
    client independent of the server-rendered templates.
 
@@ -90,24 +116,72 @@ Design principles (still the goal, mostly achieved):
 
 # What's NOT done yet (do not assume otherwise)
 
-- No admin bootstrap mechanism (see TODO TASK-011).
-- `StudySession` table exists but nothing writes to or reads from it.
-- No rate limiting on auth endpoints.
-- No Docker/CI.
-- Stats aggregation happens in Python loops, not SQL — fine at current scale.
+- **No RBAC.** Single `User.is_admin: bool` only. No Manager / Student /
+  Developer roles, no permission tables, no fine-grained matrix. See
+  TASK-037/038 (roadmap phase 4).
+- **No audit trail.** Structured JSON logs exist (TASK-021) but no
+  independent Logging DB and no before/after change history. See
+  TASK-035/036 (phase 5).
+- **No DB initialization at startup.** Docker entrypoint runs
+  `flask db upgrade` but does NOT create the DB if missing and does not run
+  idempotent seeding on boot. See TASK-033/034 (phase 3).
+- **No Database Access Layer separation.** Routes/services use `Task.query`
+  and `db.session` directly; no read/write split seam for a future Read
+  Replica. See TASK-039 (phase 6).
+- **Stats still measure the wrong signal.** `StudySession` is wired (API +
+  dashboard UI, TASK-016 DONE) but `services/statistics.py` still aggregates
+  `Task.hours` by `Task.created_at`, not `StudySession.duration` by
+  `started_at`. See TASK-027.
+- **Redis cache layer not wired.** `docker-compose.yml` ships Redis (used by
+  rate-limit storage only). See TASK-025 (depends on TASK-039).
+- **Security headers + cookie hardening** not done. See TASK-029.
+- **Health endpoints** not done. See TASK-028.
+- **Frontend migration** not started. See `.ai/PLAN_REACT_MIGRATION.md`.
 
 ---
 
-# Database Structure (current, not aspirational)
+# Database Structure (current)
 
 ```
 User 1──* Task *──1 Course *──1 Major
-Task 1──* StudySession   (schema only — unused, see TODO)
+Task 1──* StudySession   (wired — API start/stop, dashboard UI)
+User 1──* RefreshToken   (jti revocation tracking)
 ```
 
 Legacy columns retained on `Task` for compatibility during the transition:
 `course_key` (string, alongside the new `course_id` FK), `hours` (alongside
-`estimated_hours`), `done` (alongside `status`).
+`estimated_hours`), `done` (alongside `status`). Legacy `User.is_admin`
+remains alongside the target RBAC role model until confirmation.
+
+Target additions (roadmap phases 4–5):
+
+```
+Role *──* Permission          (RBAC)
+User *──* Role                (user_roles)
+Role *──* Permission          (role_permissions)
+AuditLog                     (generic audit table)
+```
 
 Future (not started, low priority — see TODO P3): Category, Achievement,
 Notification.
+
+---
+
+# Target architecture (roadmap phases 2–7)
+
+See `.ai/ROADMAP.md` for ordering and `.ai/DESIGN.md` for the full target
+system diagram. Summary:
+
+- **Phase 2** — backend production hardening: Redis cache, REST API gaps,
+  stats signal correction, health endpoints, security headers, Docker
+  migration safety, CI uplift.
+- **Phase 3** — OS-independent Docker + idempotent DB initialization at
+  startup.
+- **Phase 4** — RBAC roles + permissions + API guards (Developer / Admin /
+  Manager / Student).
+- **Phase 5** — independent Logging DB + generic audit trail (before/after
+  JSONB).
+- **Phase 6** — Database Access Layer + read/write split seam for future
+  PostgreSQL Read Replica.
+- **Phase 7** — frontend migration to Next.js + shadcn/ui with role-specific
+  dashboards.

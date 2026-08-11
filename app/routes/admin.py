@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import date, timedelta
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -5,11 +6,11 @@ from werkzeug.security import generate_password_hash
 
 from app.extensions import db
 from app.models import Course, Major, Task, User
+from app.models.refresh_token import revoke_user_refresh_tokens
 from app.routes.web import _create_course, _create_major
 from app.services.statistics import majors_for_template
 from app.utils.auth import admin_required
 from app.utils.validation import valid_password
-
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -28,11 +29,23 @@ def admin_panel():
         tasks = user.tasks.all()
         completed = [task for task in tasks if task.done]
         users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": sum(task.hours for task in completed if task.created_at == today), "week_hours": sum(task.hours for task in completed if task.created_at >= week_start), "total_hours": sum(task.hours for task in completed), "created_at": str(user.created_at)})
-    completed_tasks = Task.query.filter_by(done=True).all()
+    # System-wide hours-by-day via a single grouped SQL query instead of
+    # loading every completed task and scanning 30 days in Python.
+    rows = (
+        db.session.query(db.func.coalesce(db.func.sum(Task.hours), 0.0).label("hours"))
+        .add_columns(Task.created_at.label("day"))
+        .filter(Task.done.is_(True))
+        .group_by(Task.created_at)
+        .all()
+    )
+    hours_by_day = defaultdict(float)
+    for row in rows:
+        if row.day is not None:
+            hours_by_day[row.day] += row.hours or 0
     system_week_hours, system_month_hours = {}, {}
     for offset in range(30):
         day = today - timedelta(days=offset)
-        hours = sum(task.hours for task in completed_tasks if task.created_at == day)
+        hours = hours_by_day[day]
         if offset < 7: system_week_hours[str(day)] = hours
         if hours: system_month_hours[str(day)] = hours
     admin_user = User.query.filter_by(is_admin=True).first()
@@ -46,7 +59,11 @@ def _handle_admin_action():
         if user and not user.is_admin: db.session.delete(user)
     elif action == "change_password":
         user, password = User.query.filter_by(username=request.form.get("username")).first(), request.form.get("new_password", "").strip()
-        if user and valid_password(password): user.password = generate_password_hash(password)
+        if user and valid_password(password):
+            user.password = generate_password_hash(password)
+            # Invalidate any outstanding API refresh tokens: the password
+            # changed, so any prior session is no longer trustworthy.
+            revoke_user_refresh_tokens(user.id)
     elif action == "add_major": _create_major(request.form)
     elif action == "delete_major":
         major = db.session.get(Major, request.form.get("major_id", type=int))

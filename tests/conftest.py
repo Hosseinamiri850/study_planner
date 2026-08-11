@@ -1,15 +1,29 @@
 import sys
 import uuid
+from datetime import date
 from pathlib import Path
-from datetime import date, timedelta
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
+from werkzeug.security import generate_password_hash
+
 from app import create_app
 from app.extensions import db
-from app.models import User, Course, Major, Task, StudySession
-from werkzeug.security import generate_password_hash
+from app.integrations import translator as translator_mod
+from app.models import Course, Major, StudySession, Task, User
+
+
+@pytest.fixture(autouse=True)
+def _stub_translator_availability():
+    """The i18n context processor calls translator.is_available_cached() on
+    every render. Stub the network check so tests never hit LibreTranslate,
+    and reset the TTL cache so the stub is picked up fresh each test.
+    """
+    translator_mod.is_available = lambda: False
+    translator_mod.reset_availability_cache()
+    yield
+    translator_mod.reset_availability_cache()
 
 
 class TestConfig:
@@ -18,6 +32,8 @@ class TestConfig:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
+    WTF_CSRF_ENABLED = False
+    RATELIMIT_ENABLED = False
 
 
 @pytest.fixture
@@ -138,3 +154,13 @@ def auth_client(client, create_user):
     token = response.get_json()["access_token"]
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
     return client, user
+
+
+@pytest.fixture
+def login_tokens(client, create_user):
+    """Log in a user and return (user, access_token, refresh_token)."""
+    user = create_user(username="refreshuser", password="testpass123")
+    response = client.post("/api/auth/login", json={"username": user.username, "password": "testpass123"})
+    assert response.status_code == 200, f"Login failed: {response.get_json()}"
+    data = response.get_json()
+    return user, data["access_token"], data["refresh_token"]
