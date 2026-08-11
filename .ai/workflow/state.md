@@ -21,15 +21,15 @@ block. The latest block is the current state.
 
 ## Current state
 
-**Status:** `IDLE`
-**Task:** —
-**Implementer:** —
-**Reviewer:** —
-**Started:** —
+**Status:** `APPROVED — READY_TO_MERGE`
+**Task:** TASK-028 — Health/readiness endpoints
+**Implementer:** Claude (implementer role)
+**Reviewer:** Claude (reviewer role)
+**Started:** 2026-08-12
 **Last updated:** 2026-08-12
 
-No task active. Workflow files are initialized and ready. When the user assigns
-a task, the Implementer creates a new block below with status `PLANNING`.
+Verdict APPROVED. See `.ai/reviews/latest.md`. Ready for PR + merge via the
+Implementer (production branch flow: feature branch -> PR -> merge to `trunk`).
 
 ---
 

@@ -88,8 +88,69 @@ The single concrete next action.
 
 ## Current review
 
-_(Replace this with the filled-in template above when a task is reviewed.
-Until then, this section is empty — nothing has been reviewed yet.)_
+### Review of TASK-028 — Health/readiness endpoints
 
-No task reviewed yet. The workflow is initialized and waiting for the first
-implementation result.
+**Reviewer:** Claude (reviewer role)
+**Date:** 2026-08-12
+**Implementer:** Claude (implementer role)
+**Verdict:** APPROVED — READY_TO_MERGE
+
+#### Task acceptance criteria
+
+Re-read `.ai/TODO.md` TASK-028 before reviewing:
+
+- `GET /healthz` exists, liveness only (no DB check), always 200 when the process is up.
+- `GET /readyz` exists, runs `SELECT 1` against PostgreSQL, 200 on success and 503 on failure.
+- Both endpoints are exempt from auth and CSRF.
+- New behavior is tested.
+
+#### Claim-by-claim verification
+
+| # | Implementer claim | Status | Evidence |
+|---|---|---|---|
+| 1 | App-level routes `/healthz` + `/readyz` added inside `create_app`, `@csrf.exempt` on each | VERIFIED | `app/__init__.py:84-95` — both routes present, both decorated `@csrf.exempt`, no auth decorator |
+| 2 | `/healthz` returns 200 `{"status":"ok"}` with no DB check | VERIFIED | live probe: `healthz 200 {'status': 'ok'}` (fresh app, no Bearer token, no session) |
+| 3 | `/readyz` runs `db.session.execute(text("SELECT 1")).scalar()`, 200 `{"status":"ok","db":"ready"}` on success, 503 `{"status":"error","db":"unavailable"}` on failure | VERIFIED | live probe: `readyz 200 {'db': 'ready', 'status': 'ok'}`; 503 path exercised by `test_readyz_returns_503_when_db_unavailable` (patches `db.session.execute` to raise) |
+| 4 | Tests added: `tests/test_health.py` with 3 tests | VERIFIED | file exists; re-ran `pytest tests/test_health.py -q` → `3 passed` |
+| 5 | Full suite passes: `194 passed in 15.47s` | VERIFIED | re-ran `pytest -q` → `194 passed in 13.73s` (191 prior + 3 new) |
+| 6 | `ruff check app/ tests/` → `All checks passed!` | VERIFIED | re-ran → `All checks passed!` |
+| 7 | No schema change, no migration needed | VERIFIED | `git diff --stat trunk` touches only `app/__init__.py` + new `tests/test_health.py`; no file under `migrations/versions/` |
+| 8 | No `db.create_all()` reintroduced in the factory | VERIFIED | `db.create_all()` appears only in `tests/conftest.py:43` (test fixture), not in `app/__init__.py` |
+
+#### Findings
+
+**Blocking:** none.
+
+**Non-blocking (for follow-up, not a reject reason):**
+- `docker-compose.yml` app service still has no `healthcheck:`. Wiring `/healthz`
+  into a compose healthcheck and `depends_on: condition: service_healthy` for
+  the app is TASK-033 (OS-independent Docker hardening). Correctly deferred —
+  not this task's scope.
+- `/readyz` catches a bare `Exception`. Narrowing to
+  `SQLAlchemyError` would let non-DB errors propagate as 500s instead of being
+  reported as "db unavailable". Acceptable for now — the probe's job is
+  "is the DB reachable", and any failure answering that question is a 503.
+
+#### Convention checks (CLAUDE.md)
+
+- [x] Comments and docstrings in English — OK
+- [x] i18n strings added to both `locales/fa.json` and `locales/en.json` — N/A (no user-facing strings; probe bodies are operator-facing, not translated)
+- [x] Legacy columns (`Task.course_key`, `Task.hours`, `Task.done`) still written, not silently dropped — N/A (no model change)
+- [x] No `db.create_all()` reintroduced in app factory — OK
+- [x] Migration reviewed by hand — N/A (no migration)
+- [x] Migration has both upgrade and downgrade — N/A
+- [x] Direct callers of changed code read before editing — N/A (added new routes; nothing calls them yet)
+- [x] `pytest -q` passes — OK
+- [x] `ruff check` passes — OK
+- [x] No scope creep — OK (touched only `app/__init__.py` + new test file)
+
+#### Verdict
+
+**APPROVED — READY_TO_MERGE.** All acceptance criteria met, all claims
+verified against the diff and a live probe, conventions followed, no scope
+creep.
+
+#### Next step
+
+Implementer may merge on a feature branch + open a PR. (This repo merges via
+PR to `trunk`.)

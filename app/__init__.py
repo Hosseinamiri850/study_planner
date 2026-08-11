@@ -1,7 +1,8 @@
 """Application factory and Flask CLI commands."""
 
 import click
-from flask import Flask
+from flask import Flask, jsonify
+from sqlalchemy import text
 
 from app.config import Config
 from app.extensions import csrf, db, limiter, migrate
@@ -79,5 +80,21 @@ def create_app(config_object=None):
                             fullname=username, is_admin=True))
         db.session.commit()
         click.echo(f"Administrator '{username}' created.")
+
+    @app.route("/healthz", methods=["GET"])
+    @csrf.exempt
+    def healthz():
+        """Liveness probe — process is up. No DB check, always 200."""
+        return jsonify({"status": "ok"}), 200
+
+    @app.route("/readyz", methods=["GET"])
+    @csrf.exempt
+    def readyz():
+        """Readiness probe — DB reachable via `SELECT 1`. 503 on failure."""
+        try:
+            db.session.execute(text("SELECT 1")).scalar()
+        except Exception:
+            return jsonify({"status": "error", "db": "unavailable"}), 503
+        return jsonify({"status": "ok", "db": "ready"}), 200
 
     return app

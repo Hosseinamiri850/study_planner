@@ -42,7 +42,7 @@ dependencies. Detail lives in `.ai/TODO.md`; ordering and exit criteria in
 | TASK-025 | 2 | PLANNED | Redis caching layer | TASK-039 |
 | TASK-026 | 2 | PLANNED | REST API gaps for SPA | — |
 | TASK-027 | 2 | PLANNED | Stats correctness: StudySession signal | TASK-016 DONE, TASK-025 |
-| TASK-028 | 2 | PLANNED | /healthz + /readyz endpoints | — |
+| TASK-028 | 2 | DONE | /healthz + /readyz endpoints | — |
 | TASK-029 | 2 | PLANNED | Security headers + cookie hardening | TASK-028 |
 | TASK-030 | 3 | PLANNED | Docker migration runner safety | TASK-034 (folded) |
 | TASK-031 | 2 | PLANNED | CI quality uplift | — |

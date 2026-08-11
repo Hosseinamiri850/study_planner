@@ -86,8 +86,78 @@ Reviewer discover it by accident.
 
 ## Current result
 
-_(Replace this with the filled-in template above when a task is implemented.
-Until then, this section is empty — no task has been implemented yet.)_
+### TASK-028 — Health/readiness endpoints
 
-No task implemented yet. The workflow is initialized and waiting for the first
-assignment.
+**Implementer:** Claude (implementer role)
+**Date:** 2026-08-12
+**Task source:** `.ai/TODO.md` TASK-028
+
+#### Scope
+
+Add `GET /healthz` (liveness, no DB check, always 200) and `GET /readyz`
+(readiness, `SELECT 1` against the DB, 503 on failure). Both exempt from auth
+and CSRF so orchestrators and load balancers can probe without credentials.
+No schema change.
+
+#### Files changed
+
+- `app/__init__.py` — imported `jsonify` + `sqlalchemy.text`; added two
+  app-level routes (`/healthz`, `/readyz`) inside `create_app` after the
+  `create-admin` CLI command and before `return app`. Both decorated
+  `@csrf.exempt`; neither requires auth.
+- `tests/test_health.py` — new file, 3 tests:
+  `test_healthz_returns_200_without_auth`, `test_readyz_returns_200_when_db_healthy`,
+  `test_readyz_returns_503_when_db_unavailable`.
+
+#### Decisions made
+
+- App-level `@app.route` in the factory (not a new blueprint). Health probes
+  are infrastructure, not API (no Bearer token) and not browser UI (no
+  session). A blueprint for two routes would be more ceremony than value.
+- `@csrf.exempt` on each view function (CSRFProtect is global). Matches the
+  existing pattern used on `api.py` mutation routes.
+- `/readyz` body on success: `{"status":"ok","db":"ready"}`, on failure:
+  `{"status":"error","db":"unavailable"}`. 200/503 as the spec requires. The
+  JSON details are for operators; orchestrators decide on the HTTP status.
+- No rate limiting on the probes. They are meant to be hit frequently by
+  orchestrators; the limiter is scoped to auth endpoints only today, so this
+  is already the case.
+
+#### Migration review (if schema touched)
+
+N/A — no schema change.
+
+#### Tests
+
+- Tests added: `tests/test_health.py` (3 tests, listed above).
+- `pytest -q` summary line:
+  ```
+  194 passed in 15.47s
+  ```
+- Failures encountered: none.
+
+#### Lint
+
+- `ruff check app/ tests/`: `All checks passed!`
+
+#### Reviewer notes
+
+- `/readyz` uses `db.session.execute(text("SELECT 1")).scalar()`. On SQLite
+  (test config) this returns `1`; on PostgreSQL the same`. The 503 path is
+  exercised by patching `db.session.execute` to raise — the Reviewer should
+  confirm the patch target is correct (`app.extensions.db.session` is the
+  same object the route uses inside the app context).
+- The routes are registered inside `create_app`, so they only exist after the
+  factory runs. The `app` fixture in `conftest.py` calls `create_app`, so the
+  test client sees them.
+- `docker-compose.yml` app service has no healthcheck yet. Wiring
+  `/healthz` into a compose `healthcheck:` and `depends_on: condition:
+  service_healthy` is TASK-033 (OS-independent Docker hardening), not this
+  task.
+
+#### What was NOT done
+
+- No compose healthcheck added (TASK-033 scope).
+- No security headers / cookie hardening (TASK-029, depends on this task).
+- No `/api/health` JSON variant — the spec asked for `/healthz` + `/readyz`
+  only.

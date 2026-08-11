@@ -245,11 +245,16 @@ rows, so either keep legacy fallback for pre-cutover data or accept a one-time
 reset of historical hours. **Lands after TASK-025 so the new stats path is
 cached from day one; invalidate on session stop.**
 
-### TASK-028 — Health/readiness endpoints
+### TASK-028 — Health/readiness endpoints — DONE
 Add `GET /healthz` (liveness, no DB check, always 200 if process is up) and
 `GET /readyz` (readiness, runs `SELECT 1` against PostgreSQL, 503 on failure).
 Both exempt from auth and CSRF. Needed for container orchestrators and
 load balancers behind the Docker deployment.
+
+Done: app-level routes in `app/__init__.py` (`@csrf.exempt`, no auth);
+`/healthz` 200 `{"status":"ok"}`, `/readyz` `SELECT 1` -> 200
+`{"status":"ok","db":"ready"}` / 503 `{"status":"error","db":"unavailable"}`.
+`tests/test_health.py` (3 tests). Full suite 194 pass, ruff clean.
 
 ### TASK-029 — Security headers + cookie hardening
 Explicit security headers (`Strict-Transport-Security`, `Content-Security-Policy`,
