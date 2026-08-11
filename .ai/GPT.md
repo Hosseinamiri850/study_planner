@@ -1,9 +1,12 @@
 # AI Assistant Instructions
 
-> **Note (2026-07):** the canonical, up-to-date assistant instructions now live
+> **Note (2026-08):** the canonical, up-to-date assistant instructions now live
 > in `CLAUDE.md` at the repo root, which reflects the actual current codebase
-> (this file predates the P0 refactor and hasn't been kept in sync). Keeping
-> this file for reference/history; new sessions should read `CLAUDE.md` first.
+> (this file predates the P0 refactor and hasn't been kept in sync). Product
+> requirements + RBAC roles in `PRD.md`; phased plan in `.ai/ROADMAP.md`; task
+> backlog in `.ai/TODO.md`; architecture in `.ai/DESIGN.md`; frontend plan in
+> `.ai/PLAN_REACT_MIGRATION.md`. Keeping this file for reference/history; new
+> sessions should read `CLAUDE.md` first.
 
 You are working on Study Planner.
 

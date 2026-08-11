@@ -34,19 +34,20 @@ app/
 migrations/       Alembic. Two revisions so far: 20260723_01 (initial), 20260723_02
                    (Task.status/estimated_hours/course_id + StudySession table).
 tests/            pytest, in-memory SQLite. Good fixture coverage in conftest.py.
-                   154 tests covering models/, services/, utils/, integrations/,
-                   api.py, web.py, admin.py, CLI commands, and rate limiting.
+                   191 tests covering models/, services/, utils/, integrations/,
+                   api.py, web.py, admin.py, CLI commands, rate limiting,
+                   refresh-token rotation, and Sentry init.
 ```
 
 Two parallel auth systems exist by design and must both keep working:
 - **Browser**: Flask session cookie (`session["username"]`), CSRF-protected forms
   (`Flask-WTF` CSRFProtect is global; JSON API mutation routes use `@csrf.exempt`
   because they authenticate with a Bearer token instead).
-- **API**: stateless signed token via `itsdangerous.URLSafeTimedSerializer`
-  (`create_access_token` / `api_auth_required` in `app/utils/auth.py`), valid 24h.
-  There is currently **no revocation** — see known issues below before building
-  anything that assumes tokens can be invalidated (logout-everywhere, password-change
-  invalidation, etc.).
+- **API**: stateless signed access token via `itsdangerous.URLSafeTimedSerializer`
+  (`create_access_token` / `api_auth_required` in `app/utils/auth.py`), valid 15
+  min, plus a **revocable refresh token** (30 days, jti in the `refresh_tokens`
+  table, rotated on `/api/auth/refresh`, revoked on admin password-change via
+  `revoke_user_refresh_tokens`)..
 
 ## Working conventions
 
@@ -80,33 +81,13 @@ Two parallel auth systems exist by design and must both keep working:
 
 ## Known issues to keep in mind (see .ai/TODO.md for the prioritized version)
 
-1. **No way to create an admin account.** `seed-reference-data` deliberately creates
-   none (correct security call), but nothing replaced it — no CLI command, no promote
-   route. This blocks first-run setup. Don't "fix" it by re-adding a default
-   `admin`/`admin` seed.
-2. **`translator_available()` runs on every single page render** (it's called from
-   `inject_i18n`, which is a global `context_processor`) and makes a live HTTP
-   request to LibreTranslate with a blocking timeout. If LibreTranslate is
-   unset/unreachable, every page load pays that latency. Needs caching or an
-   async/deferred check, not a per-request network call.
-3. **`StudySession` is dead schema.** The model and migration exist; nothing in
-   `routes/` or `services/` ever creates, reads, or updates one. Either wire up
-   real session tracking (start/stop timer → duration) or don't keep extending
-   a table nothing uses.
-4. Stats in `services/statistics.py` and `routes/admin.py` compute week/month
-   hours by looping over all of a user's tasks in Python for every day in range
-   (`O(days × tasks)`), using `Task.created_at` (not `completed_at` or actual
-   `StudySession` timestamps) as the "when were these hours logged" signal. Works
-   fine at current scale; will not scale, and is arguably measuring the wrong date.
-5. `README.md` has stale/contradictory sections — the architecture note at the top
-   is accurate, but the Persian and English quick-start sections further down
-   still describe the old "auto-creates tables, auto-seeds `admin`/`admin`" behavior
-   that was intentionally removed. Fix docs, don't fix code to match old docs.
-6. No rate limiting on `/login`, `/register`, `/api/auth/login`, `/api/auth/register`.
-7. README says passwords are hashed with bcrypt; the code uses Werkzeug's default
-   hasher (`generate_password_hash`/`check_password_hash`, not bcrypt). Harmless
-   in practice, but fix the doc claim or actually switch to bcrypt — don't leave
-   the mismatch.
+1. **No RBAC.** Only `User.is_admin: bool`. No Manager/Student/Developer roles, no permission tables, no fine-grained API-level read/create/update/delete permission matrix. See `.ai/ROADMAP.md` phase 4 (TASK-037/038) and `PRD.md` for the role/permission matrix.
+2. **No audit trail.** Structured JSON logs exist (TASK-021) but no independent Logging DB and no before/after change history on core tables. See TASK-035/036 (phase 5).
+3. **No DB initialization at startup.** Docker entrypoint runs `flask db upgrade` but does not create the DB if missing and does not run idempotent seeding on boot. Re-run not guaranteed safe under multiple replicas. See TASK-033/034 (phase 3), which supersedes the older TASK-030 migration-runner-safety note.
+4. Stats in `services/statistics.py` and `routes/admin.py` compute week/month hours via SQL aggregation over `Task.hours` grouped by `Task.created_at` (TASK-017 DONE) — but the *signal is wrong*: `StudySession` is now wired (TASK-016 DONE), so stats should aggregate `StudySession.duration` by `started_at`. See TASK-027.
+5. `README.md` historically had stale/contradictory sections — the Quick Start (Persian + English) was reconciled to the migration-based flow in TASK-013, and the API table + structure blocks were updated to the 15-min access + 30-day refresh-token flow. Ongoing doc edits must stay consistent with `PRD.md`, `.ai/ROADMAP.md`, `.ai/DESIGN.md`, and `.ai/TODO.md`.
+6. ~~No rate limiting on `/login`, `/register`, `/api/auth/login`, `/api/auth/register`.~~ DONE — Flask-Limiter throttles all auth endpoints at 5/min (TASK-014).
+7. ~~README says passwords are hashed with bcrypt; the code uses Werkzeug's default hasher.~~ DONE — the bcrypt claim was removed in TASK-013; code uses Werkzeug `generate_password_hash`/`check_password_hash` (scrypt). Items marked with strikethrough are kept for history; do not re-litigate.
 
 ## Never (per project decisions in .ai/MEMORY.md)
 

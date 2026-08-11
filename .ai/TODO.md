@@ -50,12 +50,14 @@ dashboard statistics, translate. Tested in `tests/test_routes_api.py`.
 
 # P2 — Medium (originally planned)
 
-## TASK-007 — Testing — PARTIALLY DONE
-94 pytest tests covering models, services, utils, API routes. Zero coverage
-of `web.py`/`admin.py` — the actual browser UI. See new TASK-015.
+## TASK-007 — Testing — DONE (progressively expanded)
+191 pytest tests covering models, services, utils, API routes, browser routes
+(web.py + admin.py), integrations, CLI commands, rate limiting, refresh-token
+rotation, and Sentry init. Browser-route coverage was closed by TASK-015.
 
-## TASK-008 — Docker Support — NOT STARTED
-No `Dockerfile` or `docker-compose.yml` in the repo yet.
+## TASK-008 — Docker Support — superseded by TASK-020 (DONE)
+Originally tracked "no Dockerfile/compose"; TASK-020 shipped `Dockerfile` +
+`docker-compose.yml` (app + PostgreSQL 16 + Redis). Kept for traceability.
 
 ---
 
@@ -106,11 +108,14 @@ covers admin access control, user deletion, password change, major/course
 CRUD, and the delete_course task-preservation behavior. This is the actual
 product surface today; it's now as well-tested as the rest of the app.
 
-### TASK-016 — Decide the fate of StudySession
-Either wire up real start/stop session tracking (so "hours studied" reflects
-actual logged sessions instead of a one-shot `estimated_hours` field on task
-creation/completion), or stop extending a table nothing uses. This decision
-also blocks TASK-009 (Gamification/streaks) from being built on real data.
+### TASK-016 — Wire up StudySession tracking — DONE
+`StudySession` model has `start_session` / `stop` / `active_session` /
+`duration` (task.py). API endpoints exist: `POST /api/tasks/<id>/sessions`
+(start, 409 if already open), `POST .../sessions/<sid>/stop` (idempotent),
+`GET .../sessions` (list). Dashboard server-rendered UI start/stop confirmed.
+The remaining gap is stats correctness — statistics still aggregate
+`Task.hours` by `Task.created_at`, not `StudySession.duration` by
+`started_at` — that is TASK-027.
 
 ### TASK-017 — Move statistics aggregation into SQL — DONE
 `services/statistics.py` and `routes/admin.py` now sum hours-by-day via a
@@ -187,9 +192,11 @@ env. Restore verification is still the operator's responsibility (documented).
 
 The items below are the next wave. They are ordered: backend/production first,
 then the React/Next.js UI migration. See `.ai/ROADMAP.md` for the phased plan
-and `.ai/PLAN_REACT_MIGRATION.md` for the frontend migration design.
+and `.ai/PLAN_REACT_MIGRATION.md` for the frontend migration design. New
+pillars (deployment + DB init, RBAC, logging + audit, replication readiness)
+are added as phases 3–6 below.
 
-## P4 — Backend production hardening (priority 1)
+## P4 — Backend production hardening (priority 1, roadmap phase 2)
 
 ### TASK-025 — Redis caching layer before the database
 Add a Redis cache between read paths and PostgreSQL so hot queries (course list,
@@ -197,13 +204,17 @@ major list, statistics dashboard, translator availability) stop hitting the DB
 on every request. `docker-compose.yml` already ships a Redis service; wire it
 up as a cache. Use a thin wrapper (no heavy framework) with TTLs and explicit
 invalidation keys on writes. Requirements: `redis>=5.0` (async optional later).
-Tasks:
+**Dependency: now blocked on TASK-039 (DB access layer) so invalidation hooks
+sit at the data layer, not scattered across routes.** Tasks:
+- Add `REDIS_URL` to `app/config.py` (distinct from `RATELIMIT_STORAGE_URI`).
 - Add `app/extensions.py` a shared `cache` client bound to `REDIS_URL`.
 - Add `app/utils/caching.py` with `cached(key, ttl)` decorator + `invalidate(key)`.
 - Cache `all_courses_list()`, `majors_for_template()`, `is_available_cached()`
   (move the ad-hoc TTL cache onto Redis), and the per-user statistics payload.
-- Invalidate on admin major/course create/delete and on task writes.
-- Tests: cache miss/hit, invalidation, and TTL expiry.
+- Invalidate on admin major/course create/delete and on task writes (through
+  the data access layer).
+- Graceful degradation: if Redis is down, fall through to the DB, never crash.
+- Tests: cache miss/hit, invalidation, TTL expiry, and Redis-down passthrough.
 
 ### TASK-026 — REST API gaps for an SPA client
 The `/api/*` surface is usable today but missing endpoints a React/Next.js
@@ -220,17 +231,19 @@ client needs. Add:
 - Tests for every new route, mirroring `TestAuthAPI` / `TestTasksAPI`.
 
 ### TASK-027 — Stats correctness: StudySession as the hours signal
-Move statistics from `Task.created_at` + `Task.hours` to `StudySession.started_at`
-+ `StudySession.duration`. Now that sessions are wired (TASK-016), the Python
-`sum(task.hours)` loops measure the wrong date and double-count. Replace with
-SQL aggregation over `study_sessions` joined to the user's tasks:
+Now that sessions are wired (TASK-016 DONE), move statistics from
+`Task.created_at` + `Task.hours` to `StudySession.started_at` +
+`StudySession.duration`. The current `sum(task.hours)` aggregation measures
+the wrong date and double-counts. Replace with SQL aggregation over
+`study_sessions` joined to the user's tasks:
 `COALESCE(SUM(study_sessions.duration), 0)` grouped by date. Update
 `services/statistics.py`, `routes/admin.py`, `/api/statistics/dashboard`, and
 the dashboard/admin templates to read from the new numbers. Keep a fallback
 to legacy `Task.hours` while backfilling, if needed, behind a config flag.
 Decide on backfill: existing rows have `duration` but no `started_at` session
 rows, so either keep legacy fallback for pre-cutover data or accept a one-time
-reset of historical hours.
+reset of historical hours. **Lands after TASK-025 so the new stats path is
+cached from day one; invalidate on session stop.**
 
 ### TASK-028 — Health/readiness endpoints
 Add `GET /healthz` (liveness, no DB check, always 200 if process is up) and
@@ -253,6 +266,8 @@ this races. Options: (a) a one-shot init container that runs migrations and
 exits before app containers start, (b) a distributed lock around the upgrade
 on boot. Document the chosen approach in README + STRUCTURE.md. Low risk at
 current single-replica deploy, but must be decided before scaling.
+**Superseded by TASK-034 (idempotent DB initialization at startup) — fold this
+scope into TASK-034; keep this entry for traceability.**
 
 ### TASK-031 — CI quality uplift
 - Expand matrix to Python 3.12 AND 3.13 (pyproject targets 3.12; CI only runs
@@ -262,7 +277,7 @@ current single-replica deploy, but must be decided before scaling.
 - Run the suite with SQLite (current) AND PostgreSQL service container so
   migration/tz behavior is exercised against the real DB.
 
-## P5 — UI/UX migration (priority 2, after P4)
+## P5 — UI/UX migration (priority 3, roadmap phase 7, after P4 + new phases)
 
 ### TASK-032 — Next.js + shadcn/ui frontend, phase 1 (proof of concept)
 Introduce a `frontend/` directory with a Next.js 15 (App Router) client using
@@ -270,5 +285,124 @@ TypeScript, Tailwind CSS, and shadcn/ui. Phase 1 scope: a working dashboard
 route that lists tasks from `/api/tasks` and can create/toggle/delete one.
 This proves the API contract, auth flow, RTL/i18n, and shadcn setup before
 migrating everything. Do NOT remove the Jinja templates yet — both UIs run
-in parallel behind a route prefix during the migration. See
-`.ai/PLAN_REACT_MIGRATION.md` for the full phased design.
+in parallel behind a route prefix during the migration. **RBAC role dashboards
+(Developer/Admin/Manager/Student) are added in migration phase 3 — see
+`.ai/PLAN_REACT_MIGRATION.md`.**
+
+---
+
+# P6 — Deployment + idempotent DB initialization (roadmap phase 3, priority 1)
+
+## TASK-033 — OS-independent Docker hardening
+Depends on: TASK-020 DONE.
+- Confirm `Dockerfile` + `docker-compose.yml` run unchanged on Linux, macOS,
+  Windows (Docker Desktop). No host-path assumptions that break cross-OS.
+- Pin image digests for reproducible builds; run as a non-root user inside the
+  container.
+- Healthcheck wired to `/healthz` (TASK-028); compose `depends_on: condition:
+  service_healthy` for postgres + redis before the app starts.
+- Env-var driven config (no secrets in images); `.env.example` documents every
+  var. Optional separate compose files for dev vs prod overrides.
+- Tests: a CI job that builds the image and runs `docker compose up` against a
+  throwaway postgres to confirm boot.
+
+## TASK-034 — Idempotent DB initialization at startup
+Depends on: TASK-033. Supersedes TASK-030 (fold its scope in).
+- On boot: (1) connect to `DATABASE_URL`; (2) if the database does not exist,
+  create it via a bootstrap connection to the `postgres` db +
+  `CREATE DATABASE`; (3) run `flask db upgrade`; (4) run `seed-reference-data`
+  idempotently.
+- Seeding must be idempotent: `seed_reference_data()` upserts by `key` today —
+  extend the guarantee to all base data and document which data is seed vs.
+  user-created. Never re-create or duplicate user data. Specify default/seed
+  data set (reference majors/courses; no admin account — keep security call).
+- Under multiple replicas, migrations + seeding must not race: a one-shot
+  init container (compose `init` service running migrations + seed, exiting
+  before app containers start) OR a distributed advisory lock around the
+  upgrade. Choose one; document in README + STRUCTURE.md.
+- Re-run safety: a second `docker compose up` changes nothing (migrations are
+  no-op, seeding upserts, no duplicate rows).
+
+---
+
+# P7 — RBAC: roles, permissions, API guards (roadmap phase 4, priority 1)
+
+## TASK-037 — RBAC model — roles + permissions tables + migration
+Depends on: —.
+- New tables: `roles`, `permissions`, `role_permissions` (M:N), `user_roles`
+  (M:N). A simpler `users.role` enum + `permissions` bitmask is acceptable if
+  the matrix is small — decide during design, but the model must allow adding
+  a new role or permission without a rewrite.
+- Four roles: **Developer** (superuser — infra + all data, bypasses checks),
+  **Admin** (system administrator — system config, users, majors/courses,
+  system stats), **Manager** (CRM — view student status, dashboards, reports,
+  logs, student data management; no system config), **Student** (lowest — own
+  tasks CRUD, study sessions / time tracking, own results only).
+- Migration preserves existing access: users with `is_admin=True` become
+  `Admin`; all others become `Student`. Backfill in the migration; keep legacy
+  `is_admin` column until confirmation (project convention).
+- Permission granularity: Read / Create / Update / Delete per resource
+  (users, majors, courses, tasks, study_sessions, statistics, logs, system).
+
+## TASK-038 — Permission matrix + API-level guards
+Depends on: TASK-037.
+- Replace `admin_required` with `permission_required("resource:action")`.
+  Existing admin routes map to `users:read`, `users:update`, `majors:*`,
+  `courses:*`, `system:read`.
+- Every `/api/*` route declares its required permission(s).
+- Admin vs Manager distinction: Admin owns system config + roles; Manager owns
+  CRM (student status, reports, logs, student data) but cannot alter system
+  config or roles.
+- Extensibility: adding a role = insert `roles` + `role_permissions`; adding a
+  permission = insert `permissions` + attach to roles. No guard-decorator code
+  change unless a new resource type appears.
+- Tests: each role × resource × action (allow + deny).
+
+---
+
+# P8 — Logging DB + audit trail (roadmap phase 5, priority 2)
+
+## TASK-035 — Independent logging database + structured log routing
+Depends on: TASK-037 (actor identity for log records).
+- A second database (or separate schema) for application + access logs,
+  distinct from the business DB. Connection via `LOG_DATABASE_URL` (falls
+  back to the main DB if unset, so dev stays single-DB).
+- Structured logs (TASK-021 JSON formatter) write to this DB as well as stdout.
+  Retention policy: configurable TTL, prune old log rows. Volume controls:
+  log采样 for high-frequency events, cap row size.
+
+## TASK-036 — Audit trail — generic audit log + before/after capture
+Depends on: TASK-035, TASK-037, TASK-039 (hook mutations in the data layer).
+- Generic `audit_log` table (preferred over one per business table). Columns:
+  `id`, `actor_user_id`, `actor_role`, `session_id`, `request_id`, `user_ip`,
+  `action` (e.g. `task.update`), `resource_type`, `resource_id`, `before`
+  (JSONB), `after` (JSONB), `status` (success/failed), `error`, `created_at`,
+  `user_agent`. Specify which extra columns a production-ready system needs.
+- Capture before/after for update; full snapshot for create/delete.
+- Hook mutations in the data access layer (TASK-039) so every write emits an
+  audit record — not scattered through routes.
+- Manager role can read audit logs (CRM visibility); Student cannot.
+
+---
+
+# P9 — Replication readiness — DB access layer (roadmap phase 6, priority 2)
+
+## TASK-039 — Database Access Layer + read/write split config
+Depends on — (architectural; lands before TASK-025 cache + TASK-036 audit so
+both hook at the data layer).
+- Introduce a repository / data-access layer between services/routes and
+  SQLAlchemy. Routes/services call repositories (`TaskRepo.list(...)`,
+  `TaskRepo.create(...)`) which own `db.session` usage. All direct
+  `Task.query` / `db.session` usage in routes and services is removed.
+- Connection config supports independent primary + replica URIs:
+  `DATABASE_URL` (primary, read+write) and optional `DATABASE_REPLICA_URLS`
+  (comma-separated read replicas). With no replica configured, all reads go
+  to the primary.
+- Logical read/write split at the data-access layer: read methods may target a
+  replica session, write methods always target the primary. Business logic is
+  not bound to a specific connection.
+- Document consistency limits: replication lag, read-after-write expectations
+  (route read-after-write to the primary, or accept eventual consistency).
+- No failover / HA now; architecture must not block adding it later.
+- Docker/config must not require a major rewrite for primary/replica topology.
+- Demonstrated with a unit test even though no replica exists yet.

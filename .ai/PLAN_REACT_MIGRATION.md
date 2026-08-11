@@ -1,8 +1,10 @@
 # Plan — Frontend migration to Next.js + shadcn/ui
 
-_Last updated 2026-08-04. Scope: migrate the Study Planner UI from Jinja +
+_Last updated 2026-08-10. Scope: migrate the Study Planner UI from Jinja +
 Bootstrap to Next.js 15 (App Router) + TypeScript + Tailwind + shadcn/ui.
-Backend Flask stays the source of truth; the SPA talks to `/api/*` only._
+Backend Flask stays the source of truth; the SPA talks to `/api/*` only.
+RBAC roles (Developer/Admin/Manager/Student) + role-specific dashboards added
+per the production-readiness roadmap — see `.ai/ROADMAP.md` phase 4 + 7._
 
 ## Why
 
@@ -33,6 +35,26 @@ so the SPA builds against a complete, cached API.
   token is an httpOnly cookie set by a thin server action (or a proxy route)
   so the SPA never touches it directly. Logout calls `POST /api/auth/logout`
   (TASK-026) to revoke the refresh token.
+- **RBAC + role-based UI.** Four roles (see `PRD.md`): Developer (superuser),
+  Admin (system config + users + majors/courses + system stats), Manager (CRM
+  — student status, dashboards, reports, logs, student data), Student (own
+  tasks/sessions/stats only). The SPA reads `/api/me` (role) and renders only
+  routes/components the caller's permissions allow; the API is the real
+  enforcement layer — UI gating is for UX, not security.
+
+## Roles and role-specific dashboards
+
+| Role | Main pages | Dashboard |
+|------|-----------|-----------|
+| Developer | All, including system/config + logs | Superview: system health, all users, all data, audit logs, system config |
+| Admin | Users + roles, majors, courses, system stats | System: user management, roles, majors/courses CRUD, system statistics charts |
+| Manager | Students (CRM), reports, logs, student data | CRM: student status, progress charts, session logs, reports, student data management |
+| Student | Own tasks, study sessions, own stats | Personal: task CRUD, session start/stop, own progress charts |
+
+Route protection: a server-side middleware / route protector gates `/app/*`
+on a valid access token; a client-side role guard gates role-specific
+segments (e.g. `/app/admin/*`, `/app/manager/*`). Missing-permission routes
+return a 403 page, not a redirect that leaks existence.
 
 ## Stack
 
@@ -76,7 +98,21 @@ the Jinja dashboard still works.
 - Theme (dark/light) stored server-side via the API, mirrored in the UI via
   the `class` strategy on `<html>`.
 
-### Phase 3 — Dashboard full parity
+### Phase 3 — Role-specific dashboards
+
+- `/api/me` returns the caller's role; the SPA renders only routes the
+  caller's permissions allow (UI gating for UX; the API still enforces).
+- Student dashboard: own tasks CRUD, session start/stop with live timer,
+  own progress charts.
+- Manager (CRM) dashboard: student status list, progress charts, session
+  logs, reports, student data management. Behind `students:read` etc.
+- Admin dashboard: user management (roles, delete, password reset),
+  major/course CRUD, system-wide statistics chart. Behind
+  `system:*` / `users:*` / `majors:*` / `courses:*`.
+- Client-side role guard for `/app/admin/*`, `/app/manager/*`; missing
+  permission -> 403 page.
+
+### Phase 4 — Dashboard full parity
 
 - Task CRUD (full fields: priority, estimated hours, course, description).
 - Session start/stop with live timer + duration display, backed by
@@ -87,14 +123,16 @@ the Jinja dashboard still works.
   `GET /api/majors` endpoints.
 - Pagination UI on task lists (backend already paginates — TASK-018 backend).
 
-### Phase 4 — Admin panel
+### Phase 5 — Admin + Manager panels (parity)
 
-- Admin surface (`/app/admin`) behind `is_admin` API guards (TASK-026 admin
-  write endpoints).
-- User management (delete, password reset), major/course CRUD, system-wide
-  statistics chart. All via authenticated `/api/*`.
+- Admin surface (`/app/admin`) behind `system:*` / `users:*` / `majors:*` /
+  `courses:*` API guards (TASK-026 + TASK-038).
+- Manager CRM surface (`/app/manager`) behind `students:read` etc. API guards.
+- User management (delete, password reset, role assignment), major/course
+  CRUD, system-wide statistics chart, audit-log viewer. All via authenticated
+  `/api/*`.
 
-### Phase 5 — Dual-run + cutover
+### Phase 6 — Dual-run + cutover
 
 - Both UIs served; feature-flag or route-prefix chooses which is default.
 - Flip the default once parity is verified against a checklist.
