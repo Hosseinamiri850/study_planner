@@ -48,15 +48,21 @@ app/
 ## REST API
 
 The API is ready for a mobile client or a future SPA. Authentication endpoints
-return a signed access token valid for 24 hours; send it with every protected
-request as `Authorization: Bearer <access_token>`.
+return a short-lived signed access token (15 min) plus a revocable refresh
+token (30 days). Send the access token with every protected request as
+`Authorization: Bearer <access_token>`; use `/api/auth/refresh` to rotate the
+pair when the access token expires.
 
 | Method | Endpoint | Purpose |
 | --- | --- | --- |
-| POST | `/api/auth/register` | Create a user and return an access token |
-| POST | `/api/auth/login` | Sign in and return an access token |
+| POST | `/api/auth/register` | Create a user; return access + refresh tokens |
+| POST | `/api/auth/login` | Sign in; return access + refresh tokens |
+| POST | `/api/auth/refresh` | Rotate refresh token; return a new access + refresh pair |
 | GET / POST | `/api/tasks` | List or create the authenticated user's tasks |
 | PUT / DELETE | `/api/tasks/:id` | Update or remove one owned task |
+| POST | `/api/tasks/:id/sessions` | Start a study session for a task |
+| POST | `/api/tasks/:id/sessions/:sid/stop` | Stop an open study session |
+| GET | `/api/tasks/:id/sessions` | List study sessions for a task |
 | GET | `/api/statistics/dashboard` | Retrieve dashboard metrics |
 
 The browser routes continue to use session authentication and CSRF protection;
@@ -467,7 +473,8 @@ restores on a throwaway database before relying on this for production.
 
 ```
 study_planner/
-├── app.py              ← بک‌اند اصلی (روت‌ها، مدل‌ها، seed)
+├── app/                ← پکیج Flask (routes/, models/, services/, utils/)
+├── app.py              ← نقطه ورود dev (create_app را صدا می‌زند)
 ├── app/integrations/translator.py  ← ماژول ترجمه LibreTranslate
 ├── requirements.txt
 ├── .gitignore
@@ -496,7 +503,8 @@ study_planner/
 
 ```
 study_planner/
-├── app.py              ← Main app (routes, models, seed)
+├── app/                ← Flask package (routes/, models/, services/, utils/)
+├── app.py              ← Thin dev entry point (calls create_app)
 ├── app/integrations/translator.py  ← LibreTranslate integration
 ├── requirements.txt
 ├── .gitignore
