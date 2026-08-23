@@ -2,10 +2,10 @@ from flask import Blueprint, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.config import Config
-from app.extensions import csrf, db, limiter
+from app.extensions import csrf, limiter
 from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
-from app.models import Course, StudySession, Task, User
+from app.repositories import CourseRepo, TaskRepo, UserRepo
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import (
     api_auth_required,
@@ -43,8 +43,9 @@ def _resolve_course(data, existing=None):
     course_key = data.get("course_key")
     if course_id is None and course_key is None:
         return existing.course if existing else None
-    course = db.session.get(Course, course_id) if course_id is not None else Course.query.filter_by(key=course_key).first()
-    return course
+    if course_id is not None:
+        return CourseRepo.get(course_id)
+    return CourseRepo.find_by_key(course_key)
 
 
 @api_bp.route("/auth/register", methods=["POST"])
@@ -57,11 +58,13 @@ def register():
     fullname = str(data.get("fullname", "")).strip()
     if not fullname or not valid_username(username) or not valid_password(password):
         return _error("Username must be 3–80 letters, numbers, or underscores; password must be at least 8 characters.")
-    if User.query.filter_by(username=username).first():
+    if UserRepo.find_by_username(username):
         return _error("Username is already in use.", 409)
-    user = User(username=username, password=generate_password_hash(password), fullname=fullname)
-    db.session.add(user)
-    db.session.commit()
+    user = UserRepo.create(
+        username=username,
+        password_hash=generate_password_hash(password),
+        fullname=fullname,
+    )
     return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)}), 201
 
 
@@ -70,7 +73,7 @@ def register():
 @limiter.limit(Config.RATELIMIT_AUTH)
 def login():
     data = request.get_json(silent=True) or {}
-    user = User.query.filter_by(username=str(data.get("username", "")).strip()).first()
+    user = UserRepo.find_by_username(str(data.get("username", "")).strip())
     if not user or not check_password_hash(user.password, str(data.get("password", ""))):
         return _error("Invalid username or password.", 401)
     return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname}, "access_token": create_access_token(user), "refresh_token": issue_refresh_token(user)})
@@ -92,14 +95,14 @@ def refresh():
     user, access, refresh_tok = rotate_refresh_token(signed)
     if user is None:
         return _error("Invalid or expired refresh token.", 401)
-    db.session.commit()
+    # rotate_refresh_token -> issue_refresh_token already committed (revocation
+    # + new row land in that single transaction); no extra commit needed.
     return jsonify({"access_token": access, "refresh_token": refresh_tok})
 
 
 @api_bp.route("/tasks", methods=["GET"])
 @api_auth_required
 def list_tasks():
-    query = Task.query.filter_by(user_id=g.api_user.id).order_by(Task.created_at.desc(), Task.id.desc())
     page = request.args.get("page", type=int)
     per_page = request.args.get("per_page", type=int)
     # If either pagination param is set, both must be set; otherwise fall back
@@ -116,9 +119,10 @@ def list_tasks():
         per_page = min(per_page, 100)
         # Flask-SQLAlchemy paginate() emits LIMIT/OFFSET at the SQL layer,
         # so we never materialise the whole rowset into memory.
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        pagination = TaskRepo.list_for_user(g.api_user.id, page=page, per_page=per_page)
         return jsonify({"tasks": [_task_payload(task) for task in pagination.items], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
-    return jsonify({"tasks": [_task_payload(task) for task in query.all()]})
+    tasks = TaskRepo.list_for_user(g.api_user.id)
+    return jsonify({"tasks": [_task_payload(task) for task in tasks]})
 
 
 @api_bp.route("/tasks", methods=["POST"])
@@ -133,9 +137,15 @@ def create_task():
         return _error("A valid course_id or course_key is required.")
     if hours is None or not valid_priority(priority):
         return _error("estimated_hours must be between 0 and 24 and priority must be low, medium, or high.")
-    task = Task(user_id=g.api_user.id, course_id=course.id, course_key=course.key, title=str(data.get("title", "")).strip() or course.display_name(), description=str(data.get("description", "")).strip(), priority=priority, hours=hours, estimated_hours=hours)
-    db.session.add(task)
-    db.session.commit()
+    task = TaskRepo.create(
+        user_id=g.api_user.id,
+        course_id=course.id,
+        course_key=course.key,
+        title=str(data.get("title", "")).strip() or course.display_name(),
+        description=str(data.get("description", "")).strip(),
+        priority=priority,
+        hours=hours,
+    )
     return jsonify({"task": _task_payload(task)}), 201
 
 
@@ -143,29 +153,38 @@ def create_task():
 @csrf.exempt
 @api_auth_required
 def update_task(task_id):
-    task = db.session.get(Task, task_id)
+    task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
     data = request.get_json(silent=True) or {}
     course = _resolve_course(data, task)
     if ("course_id" in data or "course_key" in data) and not course:
         return _error("Course not found.")
+    fields = {}
     if course:
-        task.course, task.course_id, task.course_key = course, course.id, course.key
-    if "title" in data: task.title = str(data["title"]).strip() or course.display_name()
-    if "description" in data: task.description = str(data["description"]).strip()
+        TaskRepo.update_course_link(task, course)
+    if "title" in data:
+        fields["title"] = str(data["title"]).strip() or course.display_name()
+    if "description" in data:
+        fields["description"] = str(data["description"]).strip()
     if "priority" in data:
-        if not valid_priority(data["priority"]): return _error("Invalid priority.")
-        task.priority = data["priority"]
+        if not valid_priority(data["priority"]):
+            return _error("Invalid priority.")
+        fields["priority"] = data["priority"]
     if "estimated_hours" in data:
         hours = positive_hours(data["estimated_hours"])
-        if hours is None: return _error("estimated_hours must be between 0 and 24.")
-        task.estimated_hours = task.hours = hours
+        if hours is None:
+            return _error("estimated_hours must be between 0 and 24.")
+        fields["estimated_hours"] = hours
     if "status" in data:
-        if data["status"] == "completed": task.mark_complete()
-        elif data["status"] == "pending": task.mark_pending()
-        else: return _error("status must be pending or completed.")
-    db.session.commit()
+        if data["status"] == "completed":
+            task.mark_complete()
+        elif data["status"] == "pending":
+            task.mark_pending()
+        else:
+            return _error("status must be pending or completed.")
+    TaskRepo.update_fields(task, **fields)
+    TaskRepo.commit()
     return jsonify({"task": _task_payload(task)})
 
 
@@ -173,11 +192,10 @@ def update_task(task_id):
 @csrf.exempt
 @api_auth_required
 def delete_task(task_id):
-    task = db.session.get(Task, task_id)
+    task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
-    db.session.delete(task)
-    db.session.commit()
+    TaskRepo.delete(task)
     return "", 204
 
 
@@ -201,13 +219,12 @@ def start_session(task_id):
     Returns 409 if there is already an open session for that task — clients
     must stop the existing one before starting another.
     """
-    task = db.session.get(Task, task_id)
+    task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
-    if task.active_session is not None:
+    if TaskRepo.active_session(task.id) is not None:
         return _error("A session is already open for this task.", 409)
-    session = task.start_session()
-    db.session.commit()
+    session = TaskRepo.start_session(task)
     return jsonify({"session": _session_payload(session)}), 201
 
 
@@ -218,25 +235,24 @@ def stop_session(task_id, session_id):
     """Close an open study session owned by the caller. Idempotent: stopping
     an already-closed session returns 200 with the persisted duration.
     """
-    task = db.session.get(Task, task_id)
+    task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
-    session = db.session.get(StudySession, session_id)
+    session = TaskRepo.get_session_for_write(session_id)
     if not session or session.task_id != task_id:
         return _error("Session not found.", 404)
     if session.is_open:
-        session.stop()
-        db.session.commit()
+        TaskRepo.stop_session(session)
     return jsonify({"session": _session_payload(session)})
 
 
 @api_bp.route("/tasks/<int:task_id>/sessions", methods=["GET"])
 @api_auth_required
 def list_sessions(task_id):
-    task = db.session.get(Task, task_id)
+    task = TaskRepo.get(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
-    sessions = task.study_sessions.order_by(StudySession.started_at.desc()).all()
+    sessions = TaskRepo.list_sessions_for_task(task.id)
     return jsonify({"sessions": [_session_payload(s) for s in sessions]})
 
 

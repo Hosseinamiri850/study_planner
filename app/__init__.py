@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app.config import Config
 from app.extensions import csrf, db, limiter, migrate
-from app.models import User
+from app.repositories import UserRepo
 from app.services.seed import seed_reference_data
 from app.utils.i18n import inject_i18n
 from app.utils.logging import configure_logging, init_sentry
@@ -52,7 +52,7 @@ def create_app(config_object=None):
         logged. Intentionally the only way to bootstrap the first admin —
         `seed-reference-data` creates none.
         """
-        existing = User.query.filter_by(username=username).first()
+        existing = UserRepo.find_by_username(username)
         if existing and not promote:
             click.echo(f"Error: username '{username}' already exists. "
                        f"Use --promote to grant it admin role, or pick another username.")
@@ -65,7 +65,7 @@ def create_app(config_object=None):
                 click.echo(f"'{username}' is already an administrator.")
                 return
             existing.is_admin = True
-            db.session.commit()
+            UserRepo.commit()
             click.echo(f"Promoted '{username}' to administrator.")
             return
         if not valid_username(username):
@@ -76,9 +76,12 @@ def create_app(config_object=None):
             click.echo("Error: password must be at least 8 characters.")
             return
         from werkzeug.security import generate_password_hash
-        db.session.add(User(username=username, password=generate_password_hash(password),
-                            fullname=username, is_admin=True))
-        db.session.commit()
+        UserRepo.create(
+            username=username,
+            password_hash=generate_password_hash(password),
+            fullname=username,
+            is_admin=True,
+        )
         click.echo(f"Administrator '{username}' created.")
 
     @app.route("/healthz", methods=["GET"])

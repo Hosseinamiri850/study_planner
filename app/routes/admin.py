@@ -4,9 +4,8 @@ from datetime import date, timedelta
 from flask import Blueprint, redirect, render_template, request, url_for
 from werkzeug.security import generate_password_hash
 
-from app.extensions import db
-from app.models import Course, Major, Task, User
-from app.models.refresh_token import revoke_user_refresh_tokens
+from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
+from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.routes.web import _create_course, _create_major
 from app.services.statistics import majors_for_template
 from app.utils.auth import admin_required
@@ -22,21 +21,17 @@ def admin_panel():
         _handle_admin_action()
         return redirect(url_for("admin.admin_panel"))
 
-    users = User.query.filter_by(is_admin=False).all()
+    users = UserRepo.list_non_admin()
     today, week_start = date.today(), date.today() - timedelta(days=7)
     users_stats = []
     for user in users:
-        tasks = user.tasks.all()
+        tasks = TaskRepo.list_for_user_raw(user.id)
         completed = [task for task in tasks if task.done]
         users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": sum(task.hours for task in completed if task.created_at == today), "week_hours": sum(task.hours for task in completed if task.created_at >= week_start), "total_hours": sum(task.hours for task in completed), "created_at": str(user.created_at)})
     # System-wide hours-by-day via a single grouped SQL query instead of
     # loading every completed task and scanning 30 days in Python.
     rows = (
-        db.session.query(db.func.coalesce(db.func.sum(Task.hours), 0.0).label("hours"))
-        .add_columns(Task.created_at.label("day"))
-        .filter(Task.done.is_(True))
-        .group_by(Task.created_at)
-        .all()
+        TaskRepo.system_sum_hours_by_day()
     )
     hours_by_day = defaultdict(float)
     for row in rows:
@@ -48,31 +43,40 @@ def admin_panel():
         hours = hours_by_day[day]
         if offset < 7: system_week_hours[str(day)] = hours
         if hours: system_month_hours[str(day)] = hours
-    admin_user = User.query.filter_by(is_admin=True).first()
-    return render_template("admin.html", total_users=len(users), total_tasks_all=sum(user.tasks.count() for user in users), total_done_all=sum(user.tasks.filter_by(done=True).count() for user in users), users_stats=users_stats, majors=majors_for_template(), theme=admin_user.theme if admin_user else "dark", system_week_hours=system_week_hours, system_month_hours=system_month_hours)
+    admin_user = UserRepo.first_admin()
+    return render_template(
+        "admin.html",
+        total_users=len(users),
+        total_tasks_all=sum(TaskRepo.count_total_for_user(user.id) for user in users),
+        total_done_all=sum(TaskRepo.count_done_for_user(user.id) for user in users),
+        users_stats=users_stats,
+        majors=majors_for_template(),
+        theme=admin_user.theme if admin_user else "dark",
+        system_week_hours=system_week_hours,
+        system_month_hours=system_month_hours,
+    )
 
 
 def _handle_admin_action():
     action = request.form.get("action")
     if action == "delete_user":
-        user = User.query.filter_by(username=request.form.get("username")).first()
-        if user and not user.is_admin: db.session.delete(user)
+        user = UserRepo.find_by_username(request.form.get("username"))
+        if user and not user.is_admin: UserRepo.delete(user.id)
     elif action == "change_password":
-        user, password = User.query.filter_by(username=request.form.get("username")).first(), request.form.get("new_password", "").strip()
+        user, password = UserRepo.find_by_username(request.form.get("username")), request.form.get("new_password", "").strip()
         if user and valid_password(password):
-            user.password = generate_password_hash(password)
+            UserRepo.update_password(user, generate_password_hash(password))
             # Invalidate any outstanding API refresh tokens: the password
             # changed, so any prior session is no longer trustworthy.
-            revoke_user_refresh_tokens(user.id)
+            RefreshTokenRepo.revoke_all_for_user(user.id)
     elif action == "add_major": _create_major(request.form)
     elif action == "delete_major":
-        major = db.session.get(Major, request.form.get("major_id", type=int))
-        if major and major.key != "computer_science": db.session.delete(major)
+        major_id = request.form.get("major_id", type=int)
+        major = MajorRepo.get(major_id)
+        if major and major.key != "computer_science": MajorRepo.delete(major_id)
     elif action == "add_course": _create_course(request.form)
     elif action == "delete_course":
-        course = db.session.get(Course, request.form.get("course_id", type=int))
+        course_id = request.form.get("course_id", type=int)
+        course = CourseRepo.get(course_id)
         if course:
-            # Preserve historical tasks when an administrator removes a course.
-            Task.query.filter_by(course_id=course.id).update({"course_id": None})
-            db.session.delete(course)
-    db.session.commit()
+            CourseRepo.delete_preserve_tasks(course_id)

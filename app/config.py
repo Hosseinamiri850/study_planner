@@ -14,6 +14,11 @@ class Config:
         "DATABASE_URL",
         "postgresql+psycopg://postgres:postgres@localhost:5432/study_planner",
     )
+    # Replication readiness seam: comma-separated read-replica URIs. Empty
+    # today — no replica implemented. When set, the data-access layer routes
+    # read-only queries to a replica session and writes always go to the
+    # primary. See `.ai/DESIGN.md` and TASK-039.
+    DATABASE_REPLICA_URLS = os.environ.get("DATABASE_REPLICA_URLS", "")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     # Rate-limit storage URI: Redis when set, in-memory otherwise.

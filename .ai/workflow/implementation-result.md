@@ -86,55 +86,157 @@ Reviewer discover it by accident.
 
 ## Current result
 
-### TASK-028 — Health/readiness endpoints
+### TASK-039 — Database Access Layer + read/write split config
 
 **Implementer:** Claude (implementer role)
-**Date:** 2026-08-12
-**Task source:** `.ai/TODO.md` TASK-028
+**Date:** 2026-08-24
+**Task source:** `.ai/TODO.md` TASK-039
 
 #### Scope
 
-Add `GET /healthz` (liveness, no DB check, always 200) and `GET /readyz`
-(readiness, `SELECT 1` against the DB, 503 on failure). Both exempt from auth
-and CSRF so orchestrators and load balancers can probe without credentials.
-No schema change.
+Move all direct `db.session` / `*.query` usage out of routes and services into
+a repository layer under `app/repositories/`. Add a config seam
+(`DATABASE_REPLICA_URLS`) so a future PostgreSQL read replica can be wired in
+without a rewrite. No replica implemented — seam only, per the task's exit
+criteria ("Demonstrated with a unit test even though no replica exists yet").
 
 #### Files changed
 
-- `app/__init__.py` — imported `jsonify` + `sqlalchemy.text`; added two
-  app-level routes (`/healthz`, `/readyz`) inside `create_app` after the
-  `create-admin` CLI command and before `return app`. Both decorated
-  `@csrf.exempt`; neither requires auth.
-- `tests/test_health.py` — new file, 3 tests:
-  `test_healthz_returns_200_without_auth`, `test_readyz_returns_200_when_db_healthy`,
-  `test_readyz_returns_503_when_db_unavailable`.
+Added:
+- `app/repositories/base.py` — `read_session()` / `write_session()` seam +
+  `Repo` base. Replica engine built lazily from `DATABASE_REPLICA_URLS`
+  (first URI), cached on `current_app.config`.
+- `app/repositories/task_repo.py` — TaskRepo: get/list/paginate/count/stats
+  aggregation/session start-stop/delete/update helpers. (Started before this
+  session; completed here.)
+- `app/repositories/course_repo.py` — CourseRepo incl.
+  `delete_preserve_tasks` (nulls `tasks.course_id`, keeps legacy
+  `course_key` intact on task rows).
+- `app/repositories/major_repo.py` — MajorRepo incl. `majors_for_template`
+  read model + `add_flush` for the idempotent seeder.
+- `app/repositories/user_repo.py` — UserRepo: find/create/delete/password/
+  theme updates.
+- `app/repositories/refresh_token_repo.py` — RefreshTokenRepo:
+  find_by_jti, issue wrapper, revoke_all_for_user.
+- `app/repositories/__init__.py` — re-exports all repos. (Pre-existing.)
+- `tests/test_repositories.py` — 31 tests across all five repos.
+- `tests/test_replication_seam.py` — 8 tests: default primary fallback,
+  replica engine build, distinct replica session when configured, writes
+  always primary, read-after-write visibility without replica.
+
+Modified:
+- `app/config.py` — added `DATABASE_REPLICA_URLS = os.environ.get(..., "")`.
+  (Pre-existing from planning session.)
+- `app/routes/api.py` — all User/Course/Task/StudySession lookups and writes
+  now via UserRepo/CourseRepo/TaskRepo.
+- `app/routes/web.py` — login/register/dashboard actions/theme/view_user via
+  repos; `_create_major`/`_create_course` via MajorRepo/CourseRepo.
+- `app/routes/admin.py` — admin panel reads + all admin mutations via repos;
+  password change uses `RefreshTokenRepo.revoke_all_for_user`.
+- `app/services/statistics.py` — `get_user_stats` uses
+  `TaskRepo.list_for_user_raw` + `sum_hours_by_day_for_user`;
+  `all_courses_list` / `majors_for_template` delegate to CourseRepo/MajorRepo.
+- `app/services/seed.py` — idempotent upsert style preserved
+  (`find_by_key` → skip or `add_flush`), single commit at end via
+  MajorRepo.commit.
+- `app/__init__.py` — create-admin CLI via UserRepo (`find_by_username`,
+  `commit`, `create`). `/readyz` keeps its direct `SELECT 1` — it IS the
+  infrastructure probe, not business logic.
+- `app/utils/auth.py` — one-line change: `issue_refresh_token` now commits
+  after `RefreshToken.issue` (see Decisions).
 
 #### Decisions made
 
-- App-level `@app.route` in the factory (not a new blueprint). Health probes
-  are infrastructure, not API (no Bearer token) and not browser UI (no
-  session). A blueprint for two routes would be more ceremony than value.
-- `@csrf.exempt` on each view function (CSRFProtect is global). Matches the
-  existing pattern used on `api.py` mutation routes.
-- `/readyz` body on success: `{"status":"ok","db":"ready"}`, on failure:
-  `{"status":"error","db":"unavailable"}`. 200/503 as the spec requires. The
-  JSON details are for operators; orchestrators decide on the HTTP status.
-- No rate limiting on the probes. They are meant to be hit frequently by
-  orchestrators; the limiter is scoped to auth endpoints only today, so this
-  is already the case.
+- **Commit-per-repo-method vs single route-level commit.** Original routes
+  mutated models then issued ONE `db.session.commit()` at the bottom. Repos
+  commit inside each write method. End state identical for every flow
+  (each POST handles exactly one action); verified by the unchanged web/admin/
+  api test suites. `update_fields` deliberately does NOT commit to keep the
+  dashboard edit batching shape.
+- **Refresh-token persistence fix.** Original flow relied on the route's
+  trailing `db.session.commit()` to persist the token row that
+  `RefreshToken.issue` had only *added*. After moving user creation into
+  `UserRepo.create` (which commits first), the token add would have been left
+  uncommitted. Fixed by making `issue_refresh_token` commit itself — covers
+  register/login (api), rotate, and any future caller.
+- **`utils/auth.py` stays direct** (`User.query` in `current_user`,
+  `db.session.get(User)` in token guards): cross-cutting auth state, not
+  route/service business queries. TODO exit criterion targets "routes and
+  services". Flagged non-blocking for the Reviewer — say the word and it
+  moves to UserRepo too.
+- **Model methods untouched.** `Task.display_title`, `Task.active_session`,
+  `Task.start_session`, `RefreshToken.issue` keep their internal ORM calls —
+  they are domain logic on entities, and repos wrap/call them rather than
+  replacing them. Routes no longer reach past the repos for these operations.
+- **Dynamic relationships stay** (`user.tasks.all()`,
+  `user.tasks.count()` in admin panel): pure relationship lazy-loads on an
+  already-loaded entity, not session-level queries. Moving them would mean
+  passing sessions around for zero benefit. Same reasoning as above.
+- **Legacy columns preserved.** `TaskRepo.create` writes both `hours` and
+  `estimated_hours`; `update_fields(estimated_hours=...)` mirrors to `hours`;
+  `CourseRepo.delete_preserve_tasks` nulls `course_id` but leaves
+  `course_key` on task rows. CLAUDE.md convention respected.
 
 #### Migration review (if schema touched)
 
-N/A — no schema change.
+N/A — no schema change. `DATABASE_REPLICA_URLS` is config-only; the replica
+engine shares the primary's ORM metadata.
 
 #### Tests
 
-- Tests added: `tests/test_health.py` (3 tests, listed above).
-- `pytest -q` summary line:
+- Added: `tests/test_repositories.py` (33 tests after review fixes: TaskRepo
+  create/get, ordering, pagination, counts, mark complete/pending, field
+  updates with legacy mirror, course-link update incl. the no-match
+  submitted-key case, delete, session start/stop/list/get, hours-by-day
+  aggregation; CourseRepo get/find/list/delete_preserve_tasks by id;
+  MajorRepo get/find/list/template-shape/add_flush/delete-by-id + missing-id
+  noop; UserRepo CRUD incl. staged password update + missing-id noop;
+  RefreshTokenRepo issue/find/revoke/revoke_all).
+- Added: `tests/test_replication_seam.py` (10 tests after review fixes:
+  default primary fallback, replica engine build, distinct replica session,
+  writes always primary, read-after-write visibility without replica, plus
+  read-modify-write persistence under a configured replica and stop-session
+  persistence under replica).
+- Full suite after review fixes:
   ```
-  194 passed in 15.47s
+  238 passed, 1 warning in 16.77s
   ```
-- Failures encountered: none.
+  (194 pre-existing + 44 new.)
+- Failures during development: two initial (`MajorRepo.commit` missing on
+  seed path; two test bugs — request context around `display_name()`, config
+  key read before cache population), then three during review-fix round
+  (missing app fixture on two noop-delete tests; `scopefunc=copy_context`
+  unstable registry keys → reverted to thread-local scope + teardown).
+
+#### Review outcome (2026-08-24)
+
+First reviewer pass: **2 MAJOR + 3 MINOR + 5 NIT**, all fixed:
+
+- MAJOR (seam mutate-after-read): instances from `read_session()` attach to
+  the replica when configured; mutating them + committing primary silently
+  drops the UPDATE. Fix: `get_for_write`/`get_session_for_write` variants on
+  TaskRepo/MajorRepo/UserRepo; all mutation call sites in api.py/web.py/
+  admin.py now load via write session; two new replica-mode persistence
+  tests prove the path.
+- MAJOR (legacy course_key drift): dashboard edit with a non-matching
+  course_key no longer skipped the legacy-column write. Fix:
+  `update_course_link(task, course, course_key=...)` writes the submitted
+  key when no course matches; regression test added.
+- MINOR (password change atomicity): `update_password` stages without
+  committing; admin flow commits once together with refresh-token revocation.
+- MINOR (replica session lifecycle): app-context teardown now calls
+  `remove()` on the scoped session so connections return to the pool;
+  docstring corrected to "thread-local".
+- MINOR (admin relationship reads): per-user task lists/counts in
+  admin_panel go through `TaskRepo.list_for_user_raw` / count methods.
+- NITs: dead `UserRepo.add` removed; redundant commit after
+  rotate_refresh_token dropped; weak test asserts replaced (exact float sum,
+  session ordering); false test comment fixed.
+
+Bonus reviewer finding (confirmed pre-existing HEAD bug, fixed here):
+register/login refresh tokens were only *added*, never committed — Flask-
+SQLAlchemy 3.x teardown rolled them back, making issued refresh tokens
+unusable. `issue_refresh_token` now commits itself.
 
 #### Lint
 
@@ -142,22 +244,29 @@ N/A — no schema change.
 
 #### Reviewer notes
 
-- `/readyz` uses `db.session.execute(text("SELECT 1")).scalar()`. On SQLite
-  (test config) this returns `1`; on PostgreSQL the same`. The 503 path is
-  exercised by patching `db.session.execute` to raise — the Reviewer should
-  confirm the patch target is correct (`app.extensions.db.session` is the
-  same object the route uses inside the app context).
-- The routes are registered inside `create_app`, so they only exist after the
-  factory runs. The `app` fixture in `conftest.py` calls `create_app`, so the
-  test client sees them.
-- `docker-compose.yml` app service has no healthcheck yet. Wiring
-  `/healthz` into a compose `healthcheck:` and `depends_on: condition:
-  service_healthy` is TASK-033 (OS-independent Docker hardening), not this
-  task.
+- Re-review focus: verify the five fix groups listed under "Review outcome"
+  — especially that every mutation call site really loads via the write
+  session (grep for `TaskRepo.get(` in routes: only read-only uses remain,
+  e.g. list_sessions ownership check), and that `update_fields` + staged
+  `update_password` are always followed by an explicit commit.
+- The seam contract is now: reads may come from a replica; anything you will
+  mutate must be loaded through `*_for_write`. Nothing mechanically enforces
+  this — it lives in docstrings + the replica-mode tests. If you want it
+  enforced, a follow-up could assert instance identity against
+  `write_session()` in debug mode.
+- `_replica_engine` / `_replica_session` still cached on `current_app.config`
+  with underscore-prefixed keys. TASK-025 (Redis cache) may want the same
+  pattern or extension objects — decide together there.
 
 #### What was NOT done
 
-- No compose healthcheck added (TASK-033 scope).
-- No security headers / cookie hardening (TASK-029, depends on this task).
-- No `/api/health` JSON variant — the spec asked for `/healthz` + `/readyz`
-  only.
+- No actual replica wiring, failover, or lag handling — TASK-039 explicitly
+  scopes those out ("No failover / HA now").
+- `utils/auth.py` auth-state lookups left direct (`current_user`,
+  token guards) — cross-cutting auth state, flagged non-blocking per plan.
+- Dynamic relationship lazy-loads elsewhere (e.g.
+  `Major.courses` inside `majors_for_template`) unchanged — entity-level
+  traversal, not session-level queries.
+- No README/STRUCTURE.md doc pass yet — recommend adding a short
+  "repositories" section after review approval.
+

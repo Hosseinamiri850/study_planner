@@ -3,23 +3,14 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
-from app.extensions import db
-from app.models import Course, Major, Task
+from app.repositories import CourseRepo, MajorRepo, TaskRepo
 
 
 def get_user_stats(user):
     today = date.today()
-    tasks = user.tasks.all()
+    tasks = TaskRepo.list_for_user_raw(user.id)
     completed = [task for task in tasks if task.done]
-    # SQL aggregation: one grouped query instead of loading every task and
-    # summing in Python. O(rows in window) regardless of total task count.
-    rows = (
-        db.session.query(db.func.coalesce(db.func.sum(Task.hours), 0.0).label("hours"))
-        .add_columns(Task.created_at.label("day"))
-        .filter(Task.user_id == user.id, Task.done.is_(True))
-        .group_by(Task.created_at)
-        .all()
-    )
+    rows = TaskRepo.sum_hours_by_day_for_user(user.id)
     hours_by_day = defaultdict(float)
     for row in rows:
         if row.day is not None:
@@ -43,7 +34,7 @@ def get_user_stats(user):
 
 
 def all_courses_list():
-    courses = Course.query.join(Major).order_by(Major.name_en, Course.name_en).all()
+    courses = CourseRepo.list_all()
     seen, result = set(), []
     for course in courses:
         if course.key not in seen:
@@ -65,15 +56,4 @@ def course_stats(tasks, courses):
 
 
 def majors_for_template():
-    return [
-        {
-            "id": major.id,
-            "key": major.key,
-            "name": major.display_name(),
-            "courses": [
-                {"id": course.id, "key": course.key, "name": course.display_name()}
-                for course in major.courses
-            ],
-        }
-        for major in Major.query.order_by(Major.name_en).all()
-    ]
+    return MajorRepo.majors_for_template()

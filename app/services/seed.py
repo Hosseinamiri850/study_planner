@@ -1,7 +1,7 @@
 """Explicit development/reference-data seeding; never runs during app startup."""
 
-from app.extensions import db
 from app.models import Course, Major
+from app.repositories import CourseRepo, MajorRepo
 
 DEFAULT_DATA = {
     "majors": [{"key": "computer_science", "name_fa": "مهندسی کامپیوتر", "name_en": "Computer Science", "courses": [
@@ -24,12 +24,17 @@ DEFAULT_DATA = {
 
 def seed_reference_data():
     for major_data in DEFAULT_DATA["majors"]:
-        major = Major.query.filter_by(key=major_data["key"]).first()
+        major = MajorRepo.find_by_key(major_data["key"])
         if not major:
             major = Major(key=major_data["key"], name_fa=major_data["name_fa"], name_en=major_data["name_en"])
-            db.session.add(major)
-            db.session.flush()
+            MajorRepo.add_flush(major)
         for course_data in major_data["courses"]:
-            if not Course.query.filter_by(key=course_data["key"], major_id=major.id).first():
-                db.session.add(Course(major_id=major.id, **course_data))
-    db.session.commit()
+            if not CourseRepo.find_by_key_major(course_data["key"], major.id):
+                course = Course(
+                    key=course_data["key"],
+                    name_fa=course_data["name_fa"],
+                    name_en=course_data["name_en"],
+                    major_id=major.id,
+                )
+                CourseRepo.add_flush(course)
+        MajorRepo.commit()

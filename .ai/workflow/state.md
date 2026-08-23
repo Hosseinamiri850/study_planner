@@ -1,42 +1,28 @@
 # Workflow State
 
-This file is the shared conversation between the Implementer and the Reviewer.
-Both roles update it. The user reads it to see where a task stands.
-
-Update this file at every transition. Never delete history — append a new
-block. The latest block is the current state.
-
-## Status legend
-
-- `IDLE` — no task assigned.
-- `PLANNING` — Implementer reading the task and sketching an approach.
-- `IN_PROGRESS` — Implementer editing code.
-- `IMPLEMENTATION_DONE — PENDING_REVIEW` — Implementer finished; Reviewer should pick up.
-- `UNDER_REVIEW` — Reviewer verifying.
-- `APPROVED — READY_TO_MERGE` — Reviewer approved; waiting on user to merge.
-- `REVISIONS_REQUESTED` — Reviewer rejected with reasons; back to Implementer.
-- `ESCALATED` — Roles blocked on a judgment call; user decides.
-
----
+The state file is the shared conversation between Implementer and Reviewer.
+The Implementer writes the plan and status; the Reviewer reads it and writes
+the verdict. Keep it short — long-form detail goes in `implementation-result.md`
+(for the Implementer) and `reviews/latest.md` (for the Reviewer).
 
 ## Current state
 
-**Status:** `APPROVED — READY_TO_MERGE`
-**Task:** TASK-028 — Health/readiness endpoints
+**Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW` (post-review fixes applied)
+**Task:** TASK-039 — Database Access Layer + read/write split config
 **Implementer:** Claude (implementer role)
-**Reviewer:** Claude (reviewer role)
+**Reviewer:** Claude (reviewer role) — first pass done, findings fixed, re-review requested
 **Started:** 2026-08-12
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-24
 
-Verdict APPROVED. See `.ai/reviews/latest.md`. Ready for PR + merge via the
-Implementer (production branch flow: feature branch -> PR -> merge to `trunk`).
+First review complete: 2 MAJOR + 3 MINOR + 5 NIT found and all fixed.
+238 tests pass, ruff clean. Reviewer: verify the five fix groups in the
+history entry below and write the verdict to `.ai/reviews/latest.md`.
 
 ---
 
 ## History
 
-_(Append a new block per task or per status change within a task. Keep blocks
-short — detail lives in `implementation-result.md` and `reviews/latest.md`.)_
+_(Append a new block per task or per status change within a task.)_
 
 ### 2026-08-12 — Workflow initialized
 - Created `.ai/agents/implementer.md`, `.ai/agents/reviewer.md`.
@@ -44,39 +30,76 @@ short — detail lives in `implementation-result.md` and `reviews/latest.md`.)_
 - Created `.ai/reviews/latest.md`.
 - No application code modified. No project task started.
 
----
+### 2026-08-12 — TASK-039 planned
+- Plan written below; `DATABASE_REPLICA_URLS` added to config.
 
-## How to use this file
+### 2026-08-24 — TASK-039 IMPLEMENTATION_DONE — PENDING_REVIEW
+- Repos created: base, task, course, major, user, refresh_token.
+- Routes (`api.py`, `web.py`, `admin.py`), services (`statistics.py`,
+  `seed.py`), and the create-admin CLI refactored onto repos. Zero direct
+  `db.session` / `*.query` left in routes + services.
+- Tests: `test_repositories.py` (31) + `test_replication_seam.py` (8).
+- Full suite 233 passed, ruff clean.
 
-When starting a task, the Implementer appends a new block:
+### 2026-08-24 — Review pass done; findings fixed; re-review requested
+- Reviewer found 2 MAJOR + 3 MINOR + 5 NIT. All addressed same day:
+  MAJOR seam mutate-after-read (get_for_write variants + replica-mode
+  persistence tests); MAJOR legacy course_key drift on edit-with-no-match
+  (repo writes submitted key; regression test). MINOR: atomic password
+  change restored, replica session teardown, admin relationship reads via
+  TaskRepo. NITs: dead code, redundant commit, weak asserts.
+- Bonus finding confirmed: the issue_refresh_token commit fixes a pre-existing
+  HEAD bug — register/login refresh tokens were never committed and rolled
+  back at teardown under Flask-SQLAlchemy 3.x.
+- Full suite 238 passed, ruff clean. Status back to PENDING_REVIEW.
 
-```
-### <date> — TASK-xxx
-**Status:** PLANNING
-**Implementer:** <name>
-**Reviewer:** <name>
-**Plan:** (2–5 bullets, what you will touch and why)
-```
+## Current plan (TASK-039)
 
-Then update the **Current state** block above to match.
+Goal: move all direct `db.session` / `*.query` usage out of routes and services
+into a repository/data-access layer; add a config seam
+(`DATABASE_REPLICA_URLS`) so a future PostgreSQL Read Replica can be wired
+without a rewrite. No replica is implemented — only the seam + a unit test.
 
-Transitions append a one-line entry under the task block:
+Files to add:
+- `app/repositories/__init__.py` — re-export repos
+- `app/repositories/base.py` — `Repo` base: `session` (read), `write_session`
+  (always primary); read/write split seam via `DATABASE_REPLICA_URLS` config
+- `app/repositories/task_repo.py` — TaskRepo: list/get/create/update/delete/
+  toggle/active_session/start/stop/list_sessions
+- `app/repositories/course_repo.py` — CourseRepo: find_by_id/key/major,
+  list_all, all_courses_list, create, delete_preserve_tasks
+- `app/repositories/major_repo.py` — MajorRepo: list, find_by_key,
+  majors_for_template, create, delete
+- `app/repositories/user_repo.py` — UserRepo: find_by_username, list_non_admin,
+  list_admin, create, delete, update_password
+- `app/repositories/session_repo.py` — not needed; sessions are a Task
+  relationship. Reuse TaskRepo methods.
+- `tests/test_repositories.py` — repo CRUD + list/pagination
+- `tests/test_replication_seam.py` — read goes replica-session when configured;
+  write always primary; defaults to primary when `DATABASE_REPLICA_URLS` unset
 
-```
-- <date> IN_PROGRESS — implementing <thing>
-- <date> IMPLEMENTATION_DONE — PENDING_REVIEW — see implementation-result.md
-- <date> UNDER_REVIEW — Reviewer started
-- <date> APPROVED — READY_TO_MERGE
-```
+Files to refactor (remove direct `db.session`/`*.query`):
+- `app/routes/api.py` — all Task/Course/User lookups + writes
+- `app/routes/web.py` — dashboard action, login, register, view_user, theme
+- `app/routes/admin.py` — admin panel + `_handle_admin_action` + system stats
+- `app/services/statistics.py` — `get_user_stats`, `all_courses_list`,
+  `course_stats`, `majors_for_template`
+- `app/services/seed.py` — `seed_reference_data` (keep idempotent upsert style)
+- `app/models/refresh_token.py` — `revoke_user_refresh_tokens` moves to
+  `app/repositories/refresh_token_repo.py` (it owns the revoked-refresh write)
+- `app/config.py` — add `DATABASE_REPLICA_URLS` (default "")
 
-Or, on rejection:
+Conventions to keep:
+- Legacy columns (`Task.course_key`, `Task.hours`, `Task.done`) keep being
+  written alongside normalized ones. No silent drops.
+- `db.create_all()` stays out of the factory (tests only). Repo layer uses
+  `db.session` under the hood.
+- Existing tests stay green without behavior change (public route/api surface
+  unchanged). New tests cover the repos + seam.
 
-```
-- <date> REVISIONS_REQUESTED — <one-line reason>, see reviews/latest.md
-```
-
-On rejection, the Implementer opens a `## Implementer response` sub-block with
-what was changed and why. The Reviewer re-verifies and updates the status again.
-
-On escalation, either role opens an `## Escalation to user` sub-block with both
-positions stated briefly.
+Open question for Reviewer:
+- `utils/auth.py::current_user` uses `User.query`. It is cross-cutting auth
+  state, not a route or service business query. Plan: leave it direct (auth is
+  not the "business logic" TASK-039 targets), OR move to UserRepo for
+  consistency. I will leave it direct and flag it as a non-blocking note for
+  the Reviewer; the TODO exit criterion targets "routes and services".

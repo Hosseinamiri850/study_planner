@@ -42,6 +42,7 @@ def issue_refresh_token(user):
     """
     jti = uuid.uuid4().hex
     RefreshToken.issue(user, jti)
+    db.session.commit()
     return _refresh_serializer().dumps({"user_id": user.id, "jti": jti})
 
 
