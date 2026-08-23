@@ -6,6 +6,13 @@ directly. Reads may target a replica session; writes always go to the primary.
 
 from app.models import Course, Major, Task
 from app.repositories.base import Repo
+from app.utils.caching import KEY_COURSES_ALL, KEY_MAJORS_TEMPLATE, cache_delete
+
+
+def _invalidate_course_caches():
+    """Course writes dirty both the flat course list and the nested major/
+    course tree the templates render."""
+    cache_delete(KEY_COURSES_ALL, KEY_MAJORS_TEMPLATE)
 
 
 class CourseRepo(Repo):
@@ -61,12 +68,15 @@ class CourseRepo(Repo):
         course = Course(key=key, name_fa=name_fa, name_en=name_en, major_id=major_id)
         cls._write().add(course)
         cls._write().commit()
+        _invalidate_course_caches()
         return course
 
     @classmethod
     def add_flush(cls, course):
         """Add a course and flush so its `.id` is available to subsequent
-        writes in the same unit of work (used by the idempotent seeder)."""
+        writes in the same unit of work (used by the idempotent seeder).
+        Does NOT invalidate — the seeder commits once via MajorRepo.commit,
+        which invalidates."""
         cls._write().add(course)
         cls._write().flush()
         return course
@@ -84,4 +94,5 @@ class CourseRepo(Repo):
         session.query(Task).filter_by(course_id=course.id).update({"course_id": None})
         session.delete(course)
         session.commit()
+        _invalidate_course_caches()
         return True
