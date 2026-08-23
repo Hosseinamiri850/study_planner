@@ -86,6 +86,99 @@ Reviewer discover it by accident.
 
 ## Current result
 
+### TASK-029 — Security headers + cookie hardening
+
+**Implementer:** Claude (implementer role)
+**Date:** 2026-08-24
+**Task source:** `.ai/TODO.md` TASK-029
+
+#### Scope
+
+Attach `Strict-Transport-Security`, `Content-Security-Policy`,
+`X-Content-Type-Options`, and `Referrer-Policy` to every response, and lock
+the session cookie (`HttpOnly`, `SameSite=Lax` everywhere; `Secure`
+opt-in via env because local dev is plain HTTP). Per the TODO: start CSP
+permissive — CDN assets + inline handlers/scripts are still in the
+templates — tighten after the Next.js migration.
+
+#### Files changed
+
+Modified:
+- `app/config.py` — `SESSION_COOKIE_HTTPONLY=True`,
+  `SESSION_COOKIE_SAMESITE="Lax"`, `SESSION_COOKIE_SECURE` (env-gated,
+  default false), `PERMANENT_SESSION_LIFETIME=7 days`, five `CSP_*` keys.
+  HSTS max-age env-overridable (`HSTS_MAX_AGE`) with a one-year default.
+- `app/__init__.py` — `after_request` hook `set_security_headers` in
+  `create_app`; applies to HTML, API JSON, and health probes alike. CSP is
+  assembled from the config keys; keys absent from a custom config object
+  are skipped (TestConfig-style configs keep working).
+- `tests/test_security_headers.py` — 8 tests: headers on HTML/API/health;
+  CSP allows jsDelivr + inline; cookie flags on login (via a fixture that
+  runs the real Config over SQLite); Secure off by default, on via env;
+  lifetime constant.
+
+#### Decisions made
+
+- **after_request hook, not flask-talisman**: four headers + config-driven
+  CSP need no new dependency; talisman's defaults would fight the CDN +
+  inline reality of today's templates. Revisit if HSTS/CSP needs grow.
+- **Headers on every response** including `/api/*` and probes: cheap,
+  harmless, and avoids an allowlist that drifts.
+- **CSP permissive by design**: `script-src`/`style-src` carry
+  `'unsafe-inline'` + jsDelivr because templates use inline handlers
+  (`onclick=...` in admin.html/dashboard.html) and inline script blocks.
+  Removing these is UI-migration work, deliberately out of scope.
+- **`Secure` opt-in via `SESSION_COOKIE_SECURE` env**: forcing it would
+  break local HTTP dev; compose/prod set it when TLS terminates.
+- **Tests run the real Config** (subclassed for SQLite) rather than
+  TestConfig: the hardening keys must be exercised as shipped, not at
+  Flask defaults. TestConfig intentionally stays minimal.
+
+#### Migration review (if schema touched)
+
+N/A — no schema change.
+
+#### Tests
+
+- Added: `tests/test_security_headers.py` (8 tests listed above).
+- Full suite:
+  ```
+  246 passed, 1 warning in 38.56s
+  ```
+  (238 pre-existing + 8 new; branch predates PR #17.)
+- Failures during development: four, all instructive — direct
+  `app.config[key]` lookups crashed custom test configs (switched to skip-
+  if-absent); HSTS string missed its `max-age=` prefix; two tests asserted
+  against Flask defaults instead of the real Config (moved to the
+  hardened fixture).
+
+#### Lint
+
+- `ruff check app/ tests/`: `All checks passed!`
+
+#### Reviewer notes
+
+- The CSP skip-if-absent behavior means a config object forgetting the CSP
+  keys silently ships no CSP header. Acceptable (fail-open on header only);
+  flag if you prefer fail-closed with a default-deny fallback.
+- HSTS is sent even on plain-HTTP dev responses — browsers ignore it there,
+  so it is inert without TLS. No harm, but worth knowing.
+- `PERMANENT_SESSION_LIFETIME` only bites when `session.permanent` is set;
+  nothing sets it today. The value is declared now so login flows can opt
+  into "remember me" later without another config pass.
+
+#### What was NOT done
+
+- Nonces/hashes to drop `'unsafe-inline'` (UI-migration scope).
+- `Permissions-Policy` / `X-Frame-Options` beyond the TODO list — can add
+  `frame-ancestors 'none'` inside CSP later if clickjacking matters here.
+- README documentation of the new env vars (`SESSION_COOKIE_SECURE`,
+  `HSTS_MAX_AGE`) — batch with the REDIS_URL doc pass after reviews.
+
+---
+
+## Prior result (merged to trunk as 84c95f2)
+
 ### TASK-039 — Database Access Layer + read/write split config
 
 **Implementer:** Claude (implementer role)

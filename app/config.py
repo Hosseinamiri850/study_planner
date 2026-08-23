@@ -29,3 +29,20 @@ class Config:
     SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
     SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "production")
     SENTRY_TRACES_SAMPLE_RATE = float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.0"))
+    # Session cookie hardening (TASK-029). HTTPONLY + Samesite=Lax apply in all
+    # environments; Secure is opt-in via env because local dev is plain HTTP.
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    # 7 days: matches the refresh-token TTL's spirit; the browser session
+    # should not outlive a reasonable "remember me on this machine" window.
+    PERMANENT_SESSION_LIFETIME = 60 * 60 * 24 * 7
+    # Content-Security-Policy (TASK-029). Deliberately permissive while the
+    # server-rendered templates use CDN assets and inline handlers/scripts:
+    # Bootstrap + bootstrap-icons + Chart.js from jsDelivr, 'unsafe-inline'
+    # for style/script until the Next.js migration removes them. Tighten then.
+    CSP_DEFAULT_SRC = "'self'"
+    CSP_SCRIPT_SRC = "'self' https://cdn.jsdelivr.net 'unsafe-inline'"
+    CSP_STYLE_SRC = "'self' https://cdn.jsdelivr.net 'unsafe-inline'"
+    CSP_IMG_SRC = "'self' data:"
+    CSP_CONNECT_SRC = "'self'"
