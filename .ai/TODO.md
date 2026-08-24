@@ -283,6 +283,25 @@ format --check` intentionally skipped — no formatter adopted yet. Bonus
 bug fix bundled: CI triggers watched `master` while the default branch is
 `trunk`, so CI had not run since 2026-08-04; triggers now include `trunk`.
 
+### TASK-033 — OS-independent Docker hardening — DONE
+Base image + postgres + redis pinned by digest (verified via Hub API,
+2026-08); non-root `appuser` in the image; HEALTHCHECK wired to `/healthz`;
+compose app waits on init completion + redis; `.env.example` documents every
+env var the app reads (DB/replica, Redis, security, Sentry, translator).
+No host-path binds — named volume only, portable across Linux/macOS/Windows.
+New `docker-build-boot` CI job builds and boots the full compose stack,
+probes /healthz + /readyz, and re-runs init to prove idempotency.
+
+### TASK-034 — Idempotent DB initialization at startup — DONE
+Chose the **one-shot init container** over advisory locks (single-replica
+deploy today; simplest race-free design): compose `init` service runs
+`flask db upgrade` + `seed-reference-data` then exits; `app` uses
+`depends_on: {init: {condition: service_completed_successfully}}`. DB
+creation handled by `POSTGRES_DB`. Seeding stays key-based idempotent
+upserts (seed = reference majors/courses only, no admin — security call
+kept). Re-run safety proven by the CI restart step. Documented in README
++ STRUCTURE.md. Supersedes TASK-030 (kept above for traceability).
+
 ## P5 — UI/UX migration (priority 3, roadmap phase 7, after P4 + new phases)
 
 ### TASK-032 — Next.js + shadcn/ui frontend, phase 1 (proof of concept)
@@ -299,35 +318,7 @@ in parallel behind a route prefix during the migration. **RBAC role dashboards
 
 # P6 — Deployment + idempotent DB initialization (roadmap phase 3, priority 1)
 
-## TASK-033 — OS-independent Docker hardening
-Depends on: TASK-020 DONE.
-- Confirm `Dockerfile` + `docker-compose.yml` run unchanged on Linux, macOS,
-  Windows (Docker Desktop). No host-path assumptions that break cross-OS.
-- Pin image digests for reproducible builds; run as a non-root user inside the
-  container.
-- Healthcheck wired to `/healthz` (TASK-028); compose `depends_on: condition:
-  service_healthy` for postgres + redis before the app starts.
-- Env-var driven config (no secrets in images); `.env.example` documents every
-  var. Optional separate compose files for dev vs prod overrides.
-- Tests: a CI job that builds the image and runs `docker compose up` against a
-  throwaway postgres to confirm boot.
-
-## TASK-034 — Idempotent DB initialization at startup
-Depends on: TASK-033. Supersedes TASK-030 (fold its scope in).
-- On boot: (1) connect to `DATABASE_URL`; (2) if the database does not exist,
-  create it via a bootstrap connection to the `postgres` db +
-  `CREATE DATABASE`; (3) run `flask db upgrade`; (4) run `seed-reference-data`
-  idempotently.
-- Seeding must be idempotent: `seed_reference_data()` upserts by `key` today —
-  extend the guarantee to all base data and document which data is seed vs.
-  user-created. Never re-create or duplicate user data. Specify default/seed
-  data set (reference majors/courses; no admin account — keep security call).
-- Under multiple replicas, migrations + seeding must not race: a one-shot
-  init container (compose `init` service running migrations + seed, exiting
-  before app containers start) OR a distributed advisory lock around the
-  upgrade. Choose one; document in README + STRUCTURE.md.
-- Re-run safety: a second `docker compose up` changes nothing (migrations are
-  no-op, seeding upserts, no duplicate rows).
+### TASK-031 — CI quality uplift — DONE
 
 ---
 
@@ -412,3 +403,43 @@ both hook at the data layer).
 - No failover / HA now; architecture must not block adding it later.
 - Docker/config must not require a major rewrite for primary/replica topology.
 - Demonstrated with a unit test even though no replica exists yet.
+
+---
+
+# P10 — UI issues found during automated screenshot review (2026-08-24)
+
+Found by the `project-showcase` skill (Playwright capture of the running app,
+desktop 1440x900 + mobile 390x844). Evidence: `docs/screenshots/*.png`
+manifest warnings. Fix and re-capture to verify.
+
+## TASK-040 — No public landing page; `/` redirects to `/login`
+- Anonymous visit to `/` redirects straight to `/login` — there is no
+  public-facing landing/home page describing the product.
+- Decide: either a real marketing landing page (product name, features, CTA
+  to register/login), or keep the redirect but document it as intentional.
+- If a landing page is added: it must be i18n-aware (fa/en via `t()`), work
+  in both RTL/LTR, and link to `/register` and `/login`.
+- Affects README screenshots too — currently every anonymous capture shows
+  the login form, which undersells the project.
+
+## TASK-041 — Horizontal overflow on Persian (RTL) pages at mobile width
+- Manifest flagged `horizontal overflow detected` on `/login` and `/` (fa
+  locale) at 390px viewport; the English pages did not flag.
+- Likely culprit(s): a fixed-width element or long unbreakable string in
+  `templates/login.html` / `templates/base.html` under RTL direction.
+- Reproduce with browser devtools at 390x844, fa locale; find the offending
+  element (check fixed widths, `min-width`, long words without
+  `overflow-wrap`).
+- Acceptance: zero horizontal scroll at 390px in both fa and en locales;
+  verify by re-running the screenshot manifest (`project-showcase` skill) or
+  a small Playwright check asserting
+  `document.documentElement.scrollWidth <= window.innerWidth`.
+
+## TASK-042 — Remove/reset demo user from local dev DB before any shared capture
+- During the screenshot session a `demo` user (password `Demo1234!`) was
+  created in the local dev database for authenticated captures.
+- Before publishing screenshots anywhere or sharing the dev DB dump, delete
+  it or rotate the password:
+  `DELETE FROM users WHERE username = 'demo';`
+- Longer term: consider seeding an explicit throwaway user via the
+  idempotent seeding work (TASK-034) instead of ad-hoc inserts.

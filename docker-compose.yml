@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:16-alpine
+    # postgres:16-alpine @ 2026-08 (digest verified via Docker Hub API).
+    image: postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -16,23 +17,37 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    # redis:7-alpine @ 2026-08 (digest verified via Docker Hub API).
+    image: redis@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
     ports:
       - "6379:6379"
 
-  app:
+  # One-shot init (TASK-034): create-DB-if-missing is handled by POSTGRES_DB
+  # above; this service runs migrations + idempotent reference-data seeding
+  # exactly once, exits, and only then do app containers start. Single
+  # replica by definition — no multi-writer migration race.
+  init:
     build: .
     depends_on:
       db:
         condition: service_healthy
-      redis:
-        condition: service_started
-    environment:
+    environment: &app_env
       SECRET_KEY: dev-only-change-me
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/study_planner
       RATELIMIT_STORAGE_URI: redis://redis:6379/1
       REDIS_URL: redis://redis:6379/0
       FLASK_DEBUG: "false"
+    command: ["sh", "-c", "flask --app app db upgrade && flask --app app seed-reference-data"]
+    restart: "no"
+
+  app:
+    build: .
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      redis:
+        condition: service_started
+    environment: *app_env
     ports:
       - "5000:5000"
 

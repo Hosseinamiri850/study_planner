@@ -122,20 +122,28 @@ Design principles (still the goal, mostly achieved):
 - **No audit trail.** Structured JSON logs exist (TASK-021) but no
   independent Logging DB and no before/after change history. See
   TASK-035/036 (phase 5).
-- **No DB initialization at startup.** Docker entrypoint runs
-  `flask db upgrade` but does NOT create the DB if missing and does not run
-  idempotent seeding on boot. See TASK-033/034 (phase 3).
-- **No Database Access Layer separation.** Routes/services use `Task.query`
-  and `db.session` directly; no read/write split seam for a future Read
-  Replica. See TASK-039 (phase 6).
+- ~~**No DB initialization at startup.**~~ DONE (TASK-033/034): compose runs
+  a one-shot `init` service (`flask db upgrade` + `seed-reference-data`,
+  idempotent) that must complete before `app` starts; DB creation is handled
+  by `POSTGRES_DB`. Plain `docker run` still migrates in the entrypoint CMD.
+  Images are digest-pinned; the container runs as non-root `appuser`;
+  healthcheck hits `/healthz`.
+- ~~**No Database Access Layer separation.**~~ DONE (TASK-039): all
+  route/service reads+writes go through `app/repositories/*`; read/write
+  split seam via `DATABASE_REPLICA_URLS` (unset today — everything on the
+  primary).
 - **Stats still measure the wrong signal.** `StudySession` is wired (API +
   dashboard UI, TASK-016 DONE) but `services/statistics.py` still aggregates
   `Task.hours` by `Task.created_at`, not `StudySession.duration` by
   `started_at`. See TASK-027.
-- **Redis cache layer not wired.** `docker-compose.yml` ships Redis (used by
-  rate-limit storage only). See TASK-025 (depends on TASK-039).
-- **Security headers + cookie hardening** not done. See TASK-029.
-- **Health endpoints** not done. See TASK-028.
+- ~~**Redis cache layer not wired.**~~ DONE (TASK-025, PR #17 pending at
+  this writing): `REDIS_URL` enables the data cache over hot read models;
+  unset = passthrough to the DB. Rate-limit storage remains separate via
+  `RATELIMIT_STORAGE_URI`.
+- ~~**Security headers + cookie hardening**~~ DONE (TASK-029, PR #18):
+  HSTS/CSP/nosniff/Referrer-Policy on every response; cookie HttpOnly +
+  SameSite=Lax always, Secure env-gated.
+- **Health endpoints** done (TASK-028).
 - **Frontend migration** not started. See `.ai/PLAN_REACT_MIGRATION.md`.
 
 ---

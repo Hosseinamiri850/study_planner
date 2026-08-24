@@ -287,13 +287,16 @@ python app.py
 
 نیازی به نصب دستی PostgreSQL نیست؛ PostgreSQL و Redis و برنامه رو با هم بالا بیار:
 ```bash
-docker compose up --build
+docker compose up --build --wait
 ```
-ایمیج هنگام بوت migration‌ها را اجرا می‌کند، سپس gunicorn روی پورت ۵۰۰۰ سرو می‌دهد.
+ترتیب بوت: کانتینر `init` یک‌بار migration‌ها + seed مرجع رو اجرا می‌کنه (idempotent — اجرای دوباره چیزی تکرار نمی‌کنه)، بعد سرویس `app` بالا میاد و gunicorn روی پورت ۵۰۰۰ سرو می‌ده. ایمیج‌ها با digest پین شدن؛ healthcheck به `/healthz` وصله.
+
 ساختن ادمین داخل کانتینر در حال اجرا:
 ```bash
 docker compose exec app flask --app app create-admin <username>
 ```
+
+متغیرهای محیطی که اپ می‌خونه همه در `.env.example` مستند شدن.
 
 مرورگر رو باز کن و برو به:
 ```

@@ -1,4 +1,6 @@
-FROM python:3.13-slim
+# python:3.13-slim @ 2026-08 (digest verified via Docker Hub API).
+# Bumping the base image = update tag AND digest together.
+FROM python@sha256:ffb752e139c0a19692a43af8d8523b274222dd68eebad5d583b45c2201c6e30a
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -15,6 +17,18 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run any pending migrations, then launch gunicorn on the app factory.
+# Non-root runtime user. Image content stays root-owned/read-only to the
+# process; gunicorn binds a high port so no capability is needed.
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+USER appuser
+
+# Plain `docker run` / non-compose orchestrators: migrate then serve.
+# (Under compose, migrations + seeding run once in the dedicated init
+# service before the app starts — see docker-compose.yml / TASK-034.)
 EXPOSE 5000
-CMD ["sh", "-c", "flask --app app db upgrade && gunicorn -b 0.0.0.0:5000 -w 4 app:app"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=2).status==200 else 1)"
+# `wsgi:app` because the app/ package shadows a root-level app.py inside the
+# image, which makes `gunicorn app:app` resolve to the package (no Flask
+# instance on it) and every worker dies with "Failed to find attribute 'app'".
+CMD ["sh", "-c", "flask --app app db upgrade && gunicorn -b 0.0.0.0:5000 -w 4 wsgi:app"]

@@ -8,23 +8,27 @@ the verdict. Keep it short — long-form detail goes in `implementation-result.m
 ## Current state
 
 **Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW`
-**Task:** TASK-031 — CI quality uplift
+**Task:** TASK-033 + TASK-034 — Docker hardening + idempotent DB init
 **Implementer:** Claude (implementer role)
 **Reviewer:** —
 **Started:** 2026-08-24
 **Last updated:** 2026-08-24
 
-Branch: `ci/quality-uplift`. Matrix green; PostgreSQL job initially hung
-(root cause: `db.drop_all()` blocking on a leaked transaction's locks under
-PostgreSQL), now fixed with connection-dispose teardown + pytest-timeout.
-TASK-025 (#17) and TASK-029 (#18) merged to trunk while this PR was open.
+Branch: `feat/docker-hardening`. PRs #17/#18/#19 merged to trunk; this
+branch rebased onto the merged CI work and its conflicts resolved. The
+PostgreSQL-job hang found by this PR's CI smoke run was root-caused
+(`db.drop_all` blocking on leaked transaction locks under PostgreSQL)
+and fixed on the CI branch with dispose-before-drop + pytest-timeout +
+NullPool test engines. See `implementation-result.md`.
 
 Note: TASK-039 was merged to trunk directly (84c95f2) on user instruction;
 its review outcome is recorded in the history below.
 
-## Current plan (TASK-031)
+## Current plan (TASK-033/034)
 
-Goal: Python matrix, coverage gate, PostgreSQL CI job. CSP permissive until
+Goal: digest-pinned non-root images, healthchecks, one-shot init service
+running migrations + idempotent seed before app starts. CSP note from the
+TASK-031 plan text no longer applies here.
 the UI migration removes inline handlers/scripts.
 
 Files to modify:
