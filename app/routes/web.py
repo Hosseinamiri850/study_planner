@@ -16,6 +16,10 @@ web_bp = Blueprint("web", __name__)
 
 @web_bp.route("/")
 def home():
+    """Intentionally redirect-only (TASK-040): the product is the
+    authenticated app, so anonymous visitors land on /login and users go
+    straight to their dashboard/admin panel. No public landing page by
+    design — revisit when the Next.js migration adds public pages."""
     user = current_user()
     if user:
         return redirect(url_for("admin.admin_panel") if user.is_admin else url_for("web.dashboard"))

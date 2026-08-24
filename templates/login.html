@@ -8,9 +8,15 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; position: relative; overflow: hidden; }
-        body::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(102,126,234,0.1) 1px, transparent 1px); background-size: 50px 50px; animation: moveBackground 20s linear infinite; }
-        @keyframes moveBackground { 0% { transform: translate(0,0); } 100% { transform: translate(50px,50px); } }
+        body { background: #0f172a; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; position: relative; overflow-x: clip; }
+        /* Decorative dot grid. Sized to the viewport and animated via
+           transform so it never contributes to layout overflow (TASK-041:
+           the old -50%/200% sizing pushed scrollWidth to ~1.5x viewport). */
+        body::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle, rgba(102,126,234,0.1) 1px, transparent 1px); background-size: 50px 50px; animation: moveBackground 20s linear infinite; }
+        /* Animate background-position, not transform: a transformed box that
+           pokes past the viewport edge still creates scrollable overflow
+           (TASK-041), while background-position is pure paint. */
+        @keyframes moveBackground { 0% { background-position: 0 0; } 100% { background-position: 50px 50px; } }
         .login-container { position: relative; z-index: 1; width: 100%; max-width: 450px; padding: 20px; }
         .login-card { background: rgba(30,41,59,0.95); border-radius: 30px; padding: 50px 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); backdrop-filter: blur(10px); animation: slideUp 0.6s ease-out; border: 1px solid rgba(102,126,234,0.2); }
         @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
