@@ -12,3 +12,6 @@ build/
 instance/
 
 .coverage
+
+# Claude Code local tooling (per-machine)
+.claude/
