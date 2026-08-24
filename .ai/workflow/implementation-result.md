@@ -86,6 +86,96 @@ Reviewer discover it by accident.
 
 ## Current result
 
+### TASK-033 + TASK-034 — Docker hardening + idempotent DB initialization
+
+**Implementer:** Claude (implementer role)
+**Date:** 2026-08-24
+**Task source:** `.ai/TODO.md` TASK-033 + TASK-034 (TASK-034 supersedes TASK-030; folded in)
+
+#### Scope
+
+Pin images by digest, run non-root, wire healthchecks, gate app startup on a
+one-shot init service that migrates + seeds idempotently. Document every env
+var. Add a CI job proving the stack boots and init is re-run-safe.
+
+#### Files changed
+
+- `Dockerfile` — base pinned to `python@sha256:ffb752e...`; non-root
+  `appuser`; `HEALTHCHECK` hitting `/healthz`; CMD unchanged for plain
+  `docker run`.
+- `docker-compose.yml` — postgres + redis digest-pinned; new one-shot
+  `init` service (`flask db upgrade && flask --app app seed-reference-data`,
+  `restart: "no"`); app depends_on `init: service_completed_successfully`;
+  shared env anchor (`&app_env`) now includes REDIS_URL.
+- `.env.example` — documents every variable the app reads: SECRET_KEY,
+  DATABASE_URL, DATABASE_REPLICA_URLS, REDIS_URL, RATELIMIT_STORAGE_URI,
+  SESSION_COOKIE_SECURE, HSTS_MAX_AGE, FLASK_DEBUG, LibreTranslate pair,
+  Sentry triple.
+- `.github/workflows/ci.yml` — `docker-build-boot` job: build, `compose up
+  --wait`, curl /healthz + /readyz, then re-run init and re-probe readyz
+  (re-run safety proof). Stacked on the TASK-031 branch's PG job.
+- `README.md` — Docker section rewritten (fa): init-first boot order,
+  idempotency note, digest pinning, `--wait`, pointer to .env.example.
+- `.ai/STRUCTURE.md` — known-issues list updated (DB-init + DAL + cache +
+  headers now done with pointers).
+- `.ai/TODO.md` — TASK-033/034 marked DONE with landing notes.
+
+#### Decisions made
+
+- **Init container over advisory lock** (the TODO offered both): current
+  deploy is single-replica; a compose service that must complete before app
+  starts is race-free by construction and needs no lock machinery. If
+  multi-replica arrives, the init pattern still works unchanged (run once at
+  deploy time) — revisit only when an orchestrator manages migrations.
+- **Digests verified live via Docker Hub API** (2026-08 timestamps in
+  comments); bumping = update tag comment + digest together.
+- **DB creation delegated to POSTGRES_DB** rather than bootstrap-CREATE:
+  the official postgres image already creates it; hand-rolling a psql
+  bootstrap adds a failure mode for zero benefit.
+- **Seed scope unchanged**: reference majors/courses only, no admin account
+  (security call kept per TODO).
+- **HEALTHCHECK uses stdlib urllib**, not curl — slim image has no curl.
+
+#### Migration review (if schema touched)
+
+N/A — no schema change.
+
+#### Tests
+
+- No pytest changes; validation was structural: both YAML files parse clean;
+  compose config validated. Boot proof is the new CI job itself — first run
+  happens on this PR (flagged below).
+- Failures during development: none.
+
+#### Lint
+
+- N/A for YAML/Dockerfile; `ruff check app/ tests/`: `All checks passed!`
+  (no Python changes).
+
+#### Reviewer notes
+
+- This branch is **stacked on `ci/quality-uplift`** (PR #19) because its CI
+  job builds on that branch's PostgreSQL job. Merge #19 first, or GitHub
+  shows this diff including #19's commits until then.
+- The docker-build-boot job runs for the first time on this PR — if it
+  fails, likely suspects are (a) init container exit code, (b) the
+  `--wait` timeout being tight on cold start, (c) healthcheck timing inside
+  gunicorn boot. All three are visible in the job log.
+- Digest pinning means dependabot-style auto-bumps will NOT work on these
+  lines; bumps are manual by design here.
+
+#### What was NOT done
+
+- Separate dev/prod compose overrides (single file sufficient today; split
+  when prod needs TLS/relicas).
+- Multi-replica migration locking (init pattern suffices; documented).
+- Registry push of built images (CI builds but does not publish — publishing
+  credentials are a human decision, parked per session goal).
+
+---
+
+## Prior results
+
 ### TASK-031 — CI quality uplift
 
 **Implementer:** Claude (implementer role)
