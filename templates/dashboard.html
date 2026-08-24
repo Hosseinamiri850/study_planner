@@ -566,6 +566,26 @@
         .manage-section .form-control::placeholder {
             color: var(--text-secondary) !important;
         }
+
+        /* Mobile: the fixed 280px sidebar + its margin would squeeze the
+           content area below the users-grid minmax(280px) floor and force
+           horizontal scroll (TASK-041). Collapse to a stacked layout. */
+        @media (max-width: 900px) {
+            .sidebar {
+                position: static;
+                width: auto;
+                height: auto;
+                box-shadow: none;
+                border-bottom: 1px solid var(--border-color);
+            }
+            .main-content {
+                margin-right: 0;
+                padding: 20px 15px;
+            }
+            .users-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body class="{{ 'light-theme' if theme == 'light' else '' }}">

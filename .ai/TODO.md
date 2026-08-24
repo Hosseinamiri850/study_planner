@@ -415,14 +415,31 @@ manifest warnings. Fix and re-capture to verify.
 ## TASK-040 — No public landing page; `/` redirects to `/login`
 - Anonymous visit to `/` redirects straight to `/login` — there is no
   public-facing landing/home page describing the product.
-- Decide: either a real marketing landing page (product name, features, CTA
-  to register/login), or keep the redirect but document it as intentional.
+- **Decision (2026-08-24): keep the redirect, documented as intentional.**
+  The product today IS the authenticated app; a public marketing page is
+  UI-migration scope (TASK-032 phase 2+). Behavior noted in `web.home` so it
+  reads as deliberate, not missing. Revisit if/when TASK-032 adds public
+  pages — then make it i18n-aware (fa/en via `t()`), RTL/LTR-correct, and
+  linked to `/register` + `/login`.
 - If a landing page is added: it must be i18n-aware (fa/en via `t()`), work
   in both RTL/LTR, and link to `/register` and `/login`.
 - Affects README screenshots too — currently every anonymous capture shows
   the login form, which undersells the project.
 
-## TASK-041 — Horizontal overflow on Persian (RTL) pages at mobile width
+## TASK-041 — Horizontal overflow on Persian (RTL) pages at mobile width — DONE
+Root cause was NOT RTL-specific: `login.html`'s decorative dot-grid used a
+`body::before` sized -50%/200% and animated via `transform`, so the
+transformed box created scrollable overflow (~1.5x viewport) on every
+page that included it, both locales; the manifest just happened to capture
+it on the fa pages. Fixed by sizing the pseudo-element with `inset: 0` +
+`overflow-x: clip` on body and animating `background-position` instead of
+`transform`. Separately, `dashboard.html` had NO responsive handling of its
+fixed 280px sidebar (`margin-right: 280px`, grid `minmax(280px)`), which
+forced horizontal scroll below ~900px — added a `@media (max-width: 900px)`
+block collapsing the sidebar to static and the users-grid to one column.
+Verified live at 390x844: `/login`, `/register`, `/dashboard` in fa AND en,
+plus desktop 1440px regression check — `scrollWidth <= clientWidth`
+everywhere.
 - Manifest flagged `horizontal overflow detected` on `/login` and `/` (fa
   locale) at 390px viewport; the English pages did not flag.
 - Likely culprit(s): a fixed-width element or long unbreakable string in
@@ -435,11 +452,11 @@ manifest warnings. Fix and re-capture to verify.
   a small Playwright check asserting
   `document.documentElement.scrollWidth <= window.innerWidth`.
 
-## TASK-042 — Remove/reset demo user from local dev DB before any shared capture
+## TASK-042 — Remove/reset demo user from local dev DB before any shared capture — DONE
 - During the screenshot session a `demo` user (password `Demo1234!`) was
   created in the local dev database for authenticated captures.
-- Before publishing screenshots anywhere or sharing the dev DB dump, delete
-  it or rotate the password:
-  `DELETE FROM users WHERE username = 'demo';`
-- Longer term: consider seeding an explicit throwaway user via the
-  idempotent seeding work (TASK-034) instead of ad-hoc inserts.
+- **Done (2026-08-24): demo user deleted from the local dev DB** via
+  `UserRepo.delete` path (verified: no `demo` row remains).
+- Longer term (kept open, low priority): consider seeding an explicit
+  throwaway user via the idempotent seeding work (TASK-034) instead of
+  ad-hoc inserts — only if future screenshot sessions need one again.
