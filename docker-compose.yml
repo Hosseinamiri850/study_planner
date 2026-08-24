@@ -31,6 +31,7 @@ services:
       SECRET_KEY: dev-only-change-me
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/study_planner
       RATELIMIT_STORAGE_URI: redis://redis:6379/1
+      REDIS_URL: redis://redis:6379/0
       FLASK_DEBUG: "false"
     ports:
       - "5000:5000"
