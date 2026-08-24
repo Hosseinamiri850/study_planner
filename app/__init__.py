@@ -1,5 +1,7 @@
 """Application factory and Flask CLI commands."""
 
+import os
+
 import click
 from flask import Flask, jsonify
 from sqlalchemy import text
@@ -35,6 +37,33 @@ def create_app(config_object=None):
     app.register_blueprint(admin_bp)
     app.register_blueprint(api_bp)
     app.context_processor(inject_i18n)
+
+    @app.after_request
+    def set_security_headers(response):
+        """Attach the security headers from config (TASK-029). Applied to every
+        response including API JSON and health probes — they are cheap and
+        harmless there."""
+        response.headers.setdefault(
+            "Strict-Transport-Security",
+            f"max-age={os.environ.get('HSTS_MAX_AGE', '31536000')}; includeSubDomains",
+        )
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "; ".join(
+                f"{directive} {app.config[key]}"
+                for directive, key in (
+                    ("default-src", "CSP_DEFAULT_SRC"),
+                    ("script-src", "CSP_SCRIPT_SRC"),
+                    ("style-src", "CSP_STYLE_SRC"),
+                    ("img-src", "CSP_IMG_SRC"),
+                    ("connect-src", "CSP_CONNECT_SRC"),
+                )
+                if key in app.config
+            ),
+        )
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return response
 
     @app.cli.command("seed-reference-data")
     def seed_reference_data_command():

@@ -38,8 +38,10 @@ jobs:
   test-postgresql:
     # The suite runs on in-memory SQLite by default; this job exercises the
     # same tests against real PostgreSQL so migration/tz/SQL-dialect behavior
-    # is caught before merge.
+    # is caught before merge. pytest-timeout (thread method) dumps stacks if a
+    # test blocks — the first run of this job hung silently for 6h.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:16-alpine
@@ -69,15 +71,17 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Test against PostgreSQL
-        run: pytest -q
+        run: pytest --timeout=60 --timeout-method=thread -v
         env:
           SECRET_KEY: ci-test-secret-not-real-do-not-use
           TEST_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/study_planner_test
+          PYTHONUNBUFFERED: "1"
 
   docker-build-boot:
     # TASK-033/034 smoke test: build the image, boot the full compose stack
     # (init runs migrations + seed once), and probe /healthz + /readyz.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -86,6 +90,13 @@ jobs:
 
       - name: Boot stack (init -> app)
         run: docker compose up --wait --wait-timeout 180
+
+      - name: Dump init logs on failure
+        if: failure()
+        run: |
+          echo "===== INIT ====="; docker compose logs --no-color init 2>&1 | tail -50
+          echo "===== APP ====="; docker compose logs --no-color app 2>&1 | grep -v "^app-1   | Traceback\|arbiter.py" | head -60
+          echo "===== DB (last) ====="; docker compose logs --no-color db 2>&1 | tail -5
 
       - name: Probe health endpoints
         run: |
