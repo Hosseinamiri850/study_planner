@@ -8,17 +8,18 @@ the verdict. Keep it short — long-form detail goes in `implementation-result.m
 ## Current state
 
 **Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW`
-**Task:** TASK-031 — CI quality uplift
+**Task:** TASK-033 + TASK-034 — Docker hardening + idempotent DB init
 **Implementer:** Claude (implementer role)
 **Reviewer:** —
 **Started:** 2026-08-24
 **Last updated:** 2026-08-24
 
-Branch: `ci/quality-uplift` (off trunk @ 84c95f2). 238 tests pass,
-coverage 92.43% vs 85% gate, ruff clean. See `implementation-result.md`.
+Branch: `feat/docker-hardening`, rebased onto `ci/quality-uplift` (stacked
+PRs: this merges after #19). See `implementation-result.md`.
 
-Open PRs: #17 (TASK-025 Redis cache), #18 (TASK-029 security headers),
-both pending review. TASK-027 waits on #17.
+Open PRs: #17 (TASK-025), #18 (TASK-029), #19 (TASK-031) — pending review.
+Merge order: #19 first, then this; #17/#18 anytime.
+TASK-027 waits on #17.
 
 Note: TASK-039 was merged to trunk directly (84c95f2) on user instruction.
 
