@@ -91,6 +91,10 @@ jobs:
       - name: Boot stack (init -> app)
         run: docker compose up --wait --wait-timeout 180
 
+      - name: Dump init logs on failure
+        if: failure()
+        run: docker compose logs --no-color init db app 2>&1 | tail -80
+
       - name: Probe health endpoints
         run: |
           set -euo pipefail
