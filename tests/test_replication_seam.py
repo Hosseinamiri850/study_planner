@@ -16,6 +16,7 @@ SQLite engine as the "replica" and confirms:
 """
 
 import pytest
+from sqlalchemy.pool import NullPool
 
 from app.extensions import db
 from app.models import Task
@@ -42,6 +43,7 @@ def replica_app():
     class ReplicaConfig:
         SECRET_KEY = "test-secret-key"
         SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
         SQLALCHEMY_TRACK_MODIFICATIONS = False
         DEBUG = False
         TESTING = True

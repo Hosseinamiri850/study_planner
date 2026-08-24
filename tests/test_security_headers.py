@@ -1,6 +1,7 @@
 """Tests for security headers + session-cookie hardening (TASK-029)."""
 
 import pytest
+from sqlalchemy.pool import NullPool
 
 from app import create_app
 from app.extensions import db
@@ -47,6 +48,7 @@ def hardened_app():
 
     class HardenedConfig(Config):
         SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
         TESTING = True
         WTF_CSRF_ENABLED = False
         RATELIMIT_ENABLED = False
@@ -95,6 +97,7 @@ class TestSessionCookieHardening:
         class ProdConfig:
             SECRET_KEY = "test-secret-key"
             SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+            SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
             SQLALCHEMY_TRACK_MODIFICATIONS = False
             DEBUG = False
             TESTING = True

@@ -7,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
+from sqlalchemy.pool import NullPool
 from werkzeug.security import generate_password_hash
 
 from app import create_app
@@ -34,6 +35,10 @@ class TestConfig:
     SQLALCHEMY_DATABASE_URI = os.environ.get(
         "TEST_DATABASE_URL", "sqlite:///:memory:"
     )
+    # No pooling: every checkout is a fresh physical connection closed on
+    # return. Under the per-test create_app cycle this prevents idle pooled
+    # connections from accumulating against PostgreSQL's max_connections.
+    SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
