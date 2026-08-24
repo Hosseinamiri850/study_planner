@@ -8,17 +8,28 @@ the verdict. Keep it short — long-form detail goes in `implementation-result.m
 ## Current state
 
 **Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW`
-**Task:** TASK-025 — Redis caching layer before the database
+**Task:** TASK-029 — Security headers + cookie hardening
 **Implementer:** Claude (implementer role)
 **Reviewer:** —
 **Started:** 2026-08-24
 **Last updated:** 2026-08-24
 
-Branch: `feat/redis-cache-layer` (off trunk @ 84c95f2). 251 tests pass,
-ruff clean. See `implementation-result.md`.
+Branch: `feat/security-headers`. 246 tests pass (238 + 8 new), ruff clean.
+TASK-025 merged to trunk via PR #17 while this branch was open; conflicts
+resolved here. See `implementation-result.md`.
 
 Note: TASK-039 was merged to trunk directly (84c95f2) on user instruction;
 its review outcome is recorded in the history below.
+
+## Current plan (TASK-029)
+
+Goal: security headers + cookie hardening per TODO. CSP permissive until the
+UI migration removes inline handlers/scripts.
+
+Files to modify:
+- `app/config.py` — cookie flags, PERMANENT_SESSION_LIFETIME, CSP_* keys
+- `app/__init__.py` — after_request hook attaching HSTS/CSP/nosniff/Referrer-Policy
+- `tests/test_security_headers.py` — headers + cookie flag coverage
 
 ## Current plan (TASK-025)
 

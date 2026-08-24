@@ -86,7 +86,57 @@ Reviewer discover it by accident.
 
 ## Current result
 
-### TASK-025 — Redis caching layer before the database
+### TASK-029 — Security headers + cookie hardening
+
+**Implementer:** Claude (implementer role)
+**Date:** 2026-08-24
+**Task source:** `.ai/TODO.md` TASK-029
+
+#### Scope
+
+Attach `Strict-Transport-Security`, `Content-Security-Policy`,
+`X-Content-Type-Options`, and `Referrer-Policy` to every response, and lock
+the session cookie (`HttpOnly`, `SameSite=Lax` everywhere; `Secure`
+opt-in via env because local dev is plain HTTP). Per the TODO: start CSP
+permissive — CDN assets + inline handlers/scripts are still in the
+templates — tighten after the Next.js migration.
+
+#### Files changed
+
+Modified:
+- `app/config.py` — `SESSION_COOKIE_HTTPONLY=True`,
+  `SESSION_COOKIE_SAMESITE="Lax"`, `SESSION_COOKIE_SECURE` (env-gated,
+  default false), `PERMANENT_SESSION_LIFETIME=7 days`, five `CSP_*` keys.
+  HSTS max-age env-overridable (`HSTS_MAX_AGE`) with a one-year default.
+- `app/__init__.py` — `after_request` hook `set_security_headers` in
+  `create_app`; applies to HTML, API JSON, and health probes alike. CSP is
+  assembled from the config keys; keys absent from a custom config object
+  are skipped (TestConfig-style configs keep working).
+- `tests/test_security_headers.py` — 8 tests: headers on HTML/API/health;
+  CSP allows jsDelivr + inline; cookie flags on login (via a fixture that
+  runs the real Config over SQLite); Secure off by default, on via env;
+  lifetime constant.
+
+#### Decisions made
+
+- **after_request hook, not flask-talisman**: four headers + config-driven
+  CSP need no new dependency; talisman's defaults would fight the CDN +
+  inline reality of today's templates. Revisit if HSTS/CSP needs grow.
+- **Headers on every response** including `/api/*` and probes: cheap,
+  harmless, and avoids an allowlist that drifts.
+- **CSP permissive by design**: `script-src`/`style-src` carry
+  `'unsafe-inline'` + jsDelivr because templates use inline handlers
+  (`onclick=...` in admin.html/dashboard.html) and inline script blocks.
+  Removing these is UI-migration work, deliberately out of scope.
+- **`Secure` opt-in via `SESSION_COOKIE_SECURE` env**: forcing it would
+  break local HTTP dev; compose/prod set it when TLS terminates.
+- **Tests run the real Config** (subclassed for SQLite) rather than
+  TestConfig: the hardening keys must be exercised as shipped, not at
+  Flask defaults. TestConfig intentionally stays minimal.
+
+---
+
+### TASK-025 — Redis caching layer before the database (merged via PR #17)
 
 **Implementer:** Claude (implementer role)
 **Date:** 2026-08-24
@@ -96,104 +146,16 @@ Reviewer discover it by accident.
 
 Thin Redis cache in front of hot read paths with explicit invalidation at
 the data-access layer (the reason this task waited on TASK-039). No-op when
-`REDIS_URL` is unset; graceful degradation when Redis is down. Per the plan
-recorded in `state.md`, the per-user statistics payload is NOT cached — see
-Decisions.
+`REDIS_URL` is unset; graceful degradation when Redis is down. Per-user
+statistics payload intentionally NOT cached (single grouped SELECT already).
 
-#### Files changed
-
-Added:
-- `app/utils/caching.py` — `cache_get`/`cache_set`/`cache_delete`,
-  `cached(namespace, name, ttl)` decorator, canonical key constants. Client
-  built lazily from `REDIS_URL`, cached on app config; test seam via
-  injected `_cache_client`. JSON values only.
-- `tests/test_caching.py` — 13 tests: helpers (passthrough without Redis,
-  roundtrip, miss, corrupt entry as miss, dead-Redis reads/writes), read
-  models (second-call served from cache, invalidation on course/major
-  writes + seeder commit, language-neutrality of cached rows),
-  route-level degradation (dashboard + admin render 200 with a raising
-  client).
-
-Modified:
-- `app/config.py` — added `REDIS_URL` (distinct from RATELIMIT_STORAGE_URI).
-- `app/services/statistics.py` — `_courses_rows_cached` /
-  `_majors_rows_cached` hold language-neutral rows behind `cached()`;
-  public `all_courses_list()` / `majors_for_template()` render names per
-  request via `_request_lang()` (falls back to "fa" outside request ctx).
-- `app/integrations/translator.py` — `is_available_cached()` uses the Redis
-  cache when REDIS_URL set (shared across workers); in-process TTL dict
-  otherwise. `reset_availability_cache()` also clears the Redis key and is
-  safe without app context (conftest autouse fixture calls it pre-app).
-- `app/repositories/course_repo.py` — create/delete_preserve_tasks
-  invalidate `courses:all` + `majors:template`; `add_flush` deliberately
-  does not (seeder commits once via MajorRepo.commit, which invalidates).
-- `app/repositories/major_repo.py` — same hooks on create/delete/commit.
-- `docker-compose.yml` — app service gets `REDIS_URL: redis://redis:6379/0`.
-
-#### Decisions made
-
-- **Per-user stats payload not cached** (TODO listed it): it is invalidated
-  by every task write for that user, and the underlying read is already one
-  grouped SELECT (TASK-017). Caching would add key-per-user churn for no
-  measured win at current scale. Revisit with real traffic data.
-- **Language-neutrality in cache**: first cut cached `display_name()` output,
-  which bakes the requesting user's session language into a shared cache
-  entry — wrong for every subsequent request in the other language. Fixed by
-  caching raw `name_fa`/`name_en` rows and rendering per request.
-- **Invalidation lives in repos**, not routes — writes all flow through
-  CourseRepo/MajorRepo now (TASK-039 payoff), so routes cannot forget.
-- **TTLs are safety nets (300 s)**, correctness comes from explicit
-  invalidation. Translator availability keeps its 60 s TTL (polling semantics,
-  nothing invalidates it).
-- **No hard redis dependency**: imported lazily inside `_client()`; dev/test
-  without REDIS_URL install nothing.
-
-#### Migration review (if schema touched)
-
-N/A — no schema change.
-
-#### Tests
-
-- Added: `tests/test_caching.py` (13 tests listed above).
-- Full suite:
-  ```
-  251 passed, 1 warning in 37.23s
-  ```
-  (238 pre-existing + 13 new.)
-- Failures during development: three, fixed — autouse conftest fixture calls
-  `reset_availability_cache()` before any app context existed (guarded);
-  injected test client was ignored because `_client()` checked REDIS_URL
-  first (injection now wins); `all_courses_list()` needed request context
-  for session lang (added non-request fallback "fa").
-
-#### Lint
-
-- `ruff check app/ tests/`: `All checks passed!`
-
-#### Reviewer notes
-
-- The `cached()` decorator binds keys at import time (`courses:all`,
-  `majors:template`) — fine while both wrapped functions are zero-arg
-  read models. If a future cached function needs arguments, the decorator
-  needs key-from-args support; do not extend it silently.
-- `_request_lang()` duplicates the `session.get("lang", ...)` logic that
-  also exists in `Major.display_name()`/`Course.display_name()`. Kept
-  separate to avoid coupling models into the service; flag if you want one
-  shared helper.
-- Route-level degradation tests assert status 200 with a raising fake
-  client — they prove no-crash, not zero-latency-impact. A real Redis outage
-  adds one failed-connection attempt per cached read; connection-pool
-  tuning is ops territory, out of scope here.
-
-#### What was NOT done
-
-- Per-user statistics caching (see Decisions).
-- Read-through caching of translator translations (only availability status;
-  translating every string was never in scope).
-- README documentation of REDIS_URL — recommend adding after review with the
-  other env vars.
+Key decisions: language-neutral rows cached (names rendered per request);
+invalidation lives in CourseRepo/MajorRepo writes; TTLs are safety nets;
+no hard redis dependency (lazy import). 13 tests in `tests/test_caching.py`.
 
 ---
+
+## Prior results
 
 ### TASK-039 — Database Access Layer + read/write split config (merged to trunk as 84c95f2)
 
