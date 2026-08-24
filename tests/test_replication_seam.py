@@ -16,6 +16,7 @@ SQLite engine as the "replica" and confirms:
 """
 
 import pytest
+from sqlalchemy.pool import NullPool
 
 from app.extensions import db
 from app.models import Task
@@ -42,6 +43,7 @@ def replica_app():
     class ReplicaConfig:
         SECRET_KEY = "test-secret-key"
         SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
         SQLALCHEMY_TRACK_MODIFICATIONS = False
         DEBUG = False
         TESTING = True
@@ -53,6 +55,10 @@ def replica_app():
     with app.app_context():
         db.create_all()
         yield app
+        # See conftest.py: close pooled connections before DROP so leaked
+        # transactions cannot block on PostgreSQL.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 

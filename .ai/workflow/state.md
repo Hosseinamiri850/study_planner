@@ -8,23 +8,24 @@ the verdict. Keep it short — long-form detail goes in `implementation-result.m
 ## Current state
 
 **Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW`
-**Task:** TASK-029 — Security headers + cookie hardening
+**Task:** TASK-031 — CI quality uplift
 **Implementer:** Claude (implementer role)
 **Reviewer:** —
 **Started:** 2026-08-24
 **Last updated:** 2026-08-24
 
-Branch: `feat/security-headers`. 246 tests pass (238 + 8 new), ruff clean.
-TASK-025 merged to trunk via PR #17 while this branch was open; conflicts
-resolved here. See `implementation-result.md`.
+Branch: `ci/quality-uplift`. Matrix green; PostgreSQL job initially hung
+(root cause: `db.drop_all()` blocking on a leaked transaction's locks under
+PostgreSQL), now fixed with connection-dispose teardown + pytest-timeout.
+TASK-025 (#17) and TASK-029 (#18) merged to trunk while this PR was open.
 
 Note: TASK-039 was merged to trunk directly (84c95f2) on user instruction;
 its review outcome is recorded in the history below.
 
-## Current plan (TASK-029)
+## Current plan (TASK-031)
 
-Goal: security headers + cookie hardening per TODO. CSP permissive until the
-UI migration removes inline handlers/scripts.
+Goal: Python matrix, coverage gate, PostgreSQL CI job. CSP permissive until
+the UI migration removes inline handlers/scripts.
 
 Files to modify:
 - `app/config.py` — cookie flags, PERMANENT_SESSION_LIFETIME, CSP_* keys

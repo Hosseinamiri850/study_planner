@@ -5,6 +5,7 @@ TestConfig disables so the rest of the suite isn't throttled.
 """
 
 import pytest
+from sqlalchemy.pool import NullPool
 from werkzeug.security import generate_password_hash
 
 from app import create_app
@@ -15,6 +16,7 @@ from app.models import User
 class RateLimitConfig:
     SECRET_KEY = "test-secret-key"
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     TESTING = True
     RATELIMIT_ENABLED = True
@@ -34,6 +36,10 @@ def rl_app():
                             fullname="Locked User"))
         db.session.commit()
         yield app
+        # See conftest.py: close pooled connections before DROP so leaked
+        # transactions cannot block on PostgreSQL.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 

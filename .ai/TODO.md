@@ -274,13 +274,14 @@ current single-replica deploy, but must be decided before scaling.
 **Superseded by TASK-034 (idempotent DB initialization at startup) — fold this
 scope into TASK-034; keep this entry for traceability.**
 
-### TASK-031 — CI quality uplift
-- Expand matrix to Python 3.12 AND 3.13 (pyproject targets 3.12; CI only runs
-  3.13 today).
-- Add `pytest --cov` + a minimum coverage gate (start low, raise over time).
-- Add `ruff format --check` step if formatting is adopted.
-- Run the suite with SQLite (current) AND PostgreSQL service container so
-  migration/tz behavior is exercised against the real DB.
+### TASK-031 — CI quality uplift — DONE
+Matrix expanded to Python 3.12 + 3.13 (fail-fast off). `pytest --cov` with
+an 85% floor (measured 92.43% at landing; ratchet up over time). New
+`test-postgresql` job runs the suite against a postgres:16 service
+container via `TEST_DATABASE_URL` (env seam added to TestConfig). `ruff
+format --check` intentionally skipped — no formatter adopted yet. Bonus
+bug fix bundled: CI triggers watched `master` while the default branch is
+`trunk`, so CI had not run since 2026-08-04; triggers now include `trunk`.
 
 ## P5 — UI/UX migration (priority 3, roadmap phase 7, after P4 + new phases)
 

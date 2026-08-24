@@ -1,6 +1,7 @@
 """Tests for security headers + session-cookie hardening (TASK-029)."""
 
 import pytest
+from sqlalchemy.pool import NullPool
 
 from app import create_app
 from app.extensions import db
@@ -47,6 +48,7 @@ def hardened_app():
 
     class HardenedConfig(Config):
         SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+        SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
         TESTING = True
         WTF_CSRF_ENABLED = False
         RATELIMIT_ENABLED = False
@@ -55,6 +57,10 @@ def hardened_app():
     with app.app_context():
         db.create_all()
         yield app
+        # See conftest.py: close pooled connections before DROP so leaked
+        # transactions cannot block on PostgreSQL.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 
@@ -91,6 +97,7 @@ class TestSessionCookieHardening:
         class ProdConfig:
             SECRET_KEY = "test-secret-key"
             SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+            SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
             SQLALCHEMY_TRACK_MODIFICATIONS = False
             DEBUG = False
             TESTING = True
@@ -119,6 +126,8 @@ class TestSessionCookieHardening:
                 )
                 assert "Secure" in response.headers.get("Set-Cookie", "")
             finally:
+                db.session.remove()
+                db.engine.dispose()
                 db.drop_all()
 
     def test_permanent_session_lifetime_is_seven_days(self):

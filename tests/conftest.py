@@ -1,3 +1,4 @@
+import os
 import sys
 import uuid
 from datetime import date
@@ -6,6 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import pytest
+from sqlalchemy.pool import NullPool
 from werkzeug.security import generate_password_hash
 
 from app import create_app
@@ -28,7 +30,15 @@ def _stub_translator_availability():
 
 class TestConfig:
     SECRET_KEY = "test-secret-key"
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # TEST_DATABASE_URL lets CI run the suite against PostgreSQL (service
+    # container) instead of in-memory SQLite; unset keeps the fast default.
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "TEST_DATABASE_URL", "sqlite:///:memory:"
+    )
+    # No pooling: every checkout is a fresh physical connection closed on
+    # return. Under the per-test create_app cycle this prevents idle pooled
+    # connections from accumulating against PostgreSQL's max_connections.
+    SQLALCHEMY_ENGINE_OPTIONS = {"poolclass": NullPool}
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
@@ -42,6 +52,12 @@ def app():
     with app.app_context():
         db.create_all()
         yield app
+        # PostgreSQL blocks DROP TABLE while any connection holds a matching
+        # lock; a session left mid-transaction by a test would hang drop_all
+        # forever (seen as a silent 6h CI hang). Close every pooled
+        # connection first so leaked transactions cannot outlive the test.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 

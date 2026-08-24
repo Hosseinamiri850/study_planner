@@ -28,3 +28,17 @@ ignore = [
 "translator.py" = ["UP"]  # keep explicit `str | None` to match existing style
 "tests/*" = ["E", "W"]     # tests tolerate style nits
 "migrations/*" = ["E", "W", "F401"]  # Alembic generates unconventional imports
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+# TASK-031: the suite sits at ~96% today; the floor exists to catch coverage
+# regressions, not to measure quality. Raise as coverage grows.
+fail_under = 85
+show_missing = true
+
+[tool.pytest.ini_options]
+# Hard per-test ceiling: a test that blocks (e.g. on a DB lock) fails with a
+# stack dump instead of hanging CI for hours.
+timeout = 60

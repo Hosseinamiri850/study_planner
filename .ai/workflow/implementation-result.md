@@ -86,76 +86,61 @@ Reviewer discover it by accident.
 
 ## Current result
 
-### TASK-029 — Security headers + cookie hardening
+### TASK-031 — CI quality uplift
 
 **Implementer:** Claude (implementer role)
 **Date:** 2026-08-24
-**Task source:** `.ai/TODO.md` TASK-029
+**Task source:** `.ai/TODO.md` TASK-031
 
 #### Scope
 
-Attach `Strict-Transport-Security`, `Content-Security-Policy`,
-`X-Content-Type-Options`, and `Referrer-Policy` to every response, and lock
-the session cookie (`HttpOnly`, `SameSite=Lax` everywhere; `Secure`
-opt-in via env because local dev is plain HTTP). Per the TODO: start CSP
-permissive — CDN assets + inline handlers/scripts are still in the
-templates — tighten after the Next.js migration.
+Uplift the CI pipeline per the TODO: Python 3.12 + 3.13 matrix, a pytest
+coverage gate, and a PostgreSQL service-container run of the suite. Also
+fixes two real bugs found along the way: dead CI triggers, and the silent
+PostgreSQL-job hang (see Decisions).
 
 #### Files changed
 
 Modified:
-- `app/config.py` — `SESSION_COOKIE_HTTPONLY=True`,
-  `SESSION_COOKIE_SAMESITE="Lax"`, `SESSION_COOKIE_SECURE` (env-gated,
-  default false), `PERMANENT_SESSION_LIFETIME=7 days`, five `CSP_*` keys.
-  HSTS max-age env-overridable (`HSTS_MAX_AGE`) with a one-year default.
-- `app/__init__.py` — `after_request` hook `set_security_headers` in
-  `create_app`; applies to HTML, API JSON, and health probes alike. CSP is
-  assembled from the config keys; keys absent from a custom config object
-  are skipped (TestConfig-style configs keep working).
-- `tests/test_security_headers.py` — 8 tests: headers on HTML/API/health;
-  CSP allows jsDelivr + inline; cookie flags on login (via a fixture that
-  runs the real Config over SQLite); Secure off by default, on via env;
-  lifetime constant.
+- `.github/workflows/ci.yml` — triggers fixed to include `trunk`;
+  3.12+3.13 matrix with coverage gate; new `test-postgresql` job
+  (20-min cap) running pytest with `--timeout=60 --timeout-method=thread`
+  so any blocked test fails with a stack dump instead of hanging silently.
+- `tests/conftest.py` — `TEST_DATABASE_URL` env seam for the PG job;
+  teardown now calls `db.session.remove()` + `db.engine.dispose()` before
+  `db.drop_all()` (ROOT CAUSE of the first-run hang: PostgreSQL blocks
+  DROP TABLE while any pooled connection holds a leaked transaction's
+  locks — SQLite never exhibits this). Same treatment applied to every
+  custom app fixture (`test_rate_limiting.py`, `test_replication_seam.py`,
+  `test_security_headers.py`).
+- `pyproject.toml` — coverage config + `fail_under = 85` + default
+  `timeout = 60` for pytest.
+- `requirements-dev.txt` — adds `pytest-cov>=5.0.0`, `pytest-timeout>=2.3.0`.
 
 #### Decisions made
 
-- **after_request hook, not flask-talisman**: four headers + config-driven
-  CSP need no new dependency; talisman's defaults would fight the CDN +
-  inline reality of today's templates. Revisit if HSTS/CSP needs grow.
-- **Headers on every response** including `/api/*` and probes: cheap,
-  harmless, and avoids an allowlist that drifts.
-- **CSP permissive by design**: `script-src`/`style-src` carry
-  `'unsafe-inline'` + jsDelivr because templates use inline handlers
-  (`onclick=...` in admin.html/dashboard.html) and inline script blocks.
-  Removing these is UI-migration work, deliberately out of scope.
-- **`Secure` opt-in via `SESSION_COOKIE_SECURE` env**: forcing it would
-  break local HTTP dev; compose/prod set it when TLS terminates.
-- **Tests run the real Config** (subclassed for SQLite) rather than
-  TestConfig: the hardening keys must be exercised as shipped, not at
-  Flask defaults. TestConfig intentionally stays minimal.
+- **Dead CI triggers fixed**: workflow watched `master`, default branch is
+  `trunk` — no CI had run since 2026-08-04.
+- **Coverage gate at 85**, measured 92%+ at landing.
+- **Hang diagnosis path**: first PG run hung 6h with zero output; added
+  pytest-timeout → second run pinpointed the blocking frame to conftest's
+  `db.drop_all()`. Fix = dispose connections before DDL, plus the timeout
+  stays as a permanent tripwire.
 
 ---
 
-### TASK-025 — Redis caching layer before the database (merged via PR #17)
+## Prior results (merged via their own PRs)
 
-**Implementer:** Claude (implementer role)
-**Date:** 2026-08-24
-**Task source:** `.ai/TODO.md` TASK-025
+### TASK-029 — Security headers + cookie hardening (PR #18)
 
-#### Scope
+after_request hook adds HSTS/CSP/nosniff/Referrer-Policy everywhere; cookie
+HttpOnly + SameSite=Lax always, Secure env-gated; lifetime 7 days. CSP
+permissive until UI migration removes inline handlers/scripts. 8 tests.
 
-Thin Redis cache in front of hot read paths with explicit invalidation at
-the data-access layer (the reason this task waited on TASK-039). No-op when
-`REDIS_URL` is unset; graceful degradation when Redis is down. Per-user
-statistics payload intentionally NOT cached (single grouped SELECT already).
+### TASK-025 — Redis caching layer before the database (PR #17)
 
-Key decisions: language-neutral rows cached (names rendered per request);
-invalidation lives in CourseRepo/MajorRepo writes; TTLs are safety nets;
-no hard redis dependency (lazy import). 13 tests in `tests/test_caching.py`.
-
----
-
-## Prior results
+Thin cache over hot read models with data-layer invalidation; language-
+neutral rows; graceful degradation without REDIS_URL. 13 tests.
 
 ### TASK-039 — Database Access Layer + read/write split config (merged to trunk as 84c95f2)
 
