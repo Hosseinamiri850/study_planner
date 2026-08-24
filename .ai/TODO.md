@@ -412,3 +412,43 @@ both hook at the data layer).
 - No failover / HA now; architecture must not block adding it later.
 - Docker/config must not require a major rewrite for primary/replica topology.
 - Demonstrated with a unit test even though no replica exists yet.
+
+---
+
+# P10 — UI issues found during automated screenshot review (2026-08-24)
+
+Found by the `project-showcase` skill (Playwright capture of the running app,
+desktop 1440x900 + mobile 390x844). Evidence: `docs/screenshots/*.png`
+manifest warnings. Fix and re-capture to verify.
+
+## TASK-040 — No public landing page; `/` redirects to `/login`
+- Anonymous visit to `/` redirects straight to `/login` — there is no
+  public-facing landing/home page describing the product.
+- Decide: either a real marketing landing page (product name, features, CTA
+  to register/login), or keep the redirect but document it as intentional.
+- If a landing page is added: it must be i18n-aware (fa/en via `t()`), work
+  in both RTL/LTR, and link to `/register` and `/login`.
+- Affects README screenshots too — currently every anonymous capture shows
+  the login form, which undersells the project.
+
+## TASK-041 — Horizontal overflow on Persian (RTL) pages at mobile width
+- Manifest flagged `horizontal overflow detected` on `/login` and `/` (fa
+  locale) at 390px viewport; the English pages did not flag.
+- Likely culprit(s): a fixed-width element or long unbreakable string in
+  `templates/login.html` / `templates/base.html` under RTL direction.
+- Reproduce with browser devtools at 390x844, fa locale; find the offending
+  element (check fixed widths, `min-width`, long words without
+  `overflow-wrap`).
+- Acceptance: zero horizontal scroll at 390px in both fa and en locales;
+  verify by re-running the screenshot manifest (`project-showcase` skill) or
+  a small Playwright check asserting
+  `document.documentElement.scrollWidth <= window.innerWidth`.
+
+## TASK-042 — Remove/reset demo user from local dev DB before any shared capture
+- During the screenshot session a `demo` user (password `Demo1234!`) was
+  created in the local dev database for authenticated captures.
+- Before publishing screenshots anywhere or sharing the dev DB dump, delete
+  it or rotate the password:
+  `DELETE FROM users WHERE username = 'demo';`
+- Longer term: consider seeding an explicit throwaway user via the
+  idempotent seeding work (TASK-034) instead of ad-hoc inserts.
