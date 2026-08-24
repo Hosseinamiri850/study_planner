@@ -28,4 +28,7 @@ USER appuser
 EXPOSE 5000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=2).status==200 else 1)"
-CMD ["sh", "-c", "flask --app app db upgrade && gunicorn -b 0.0.0.0:5000 -w 4 app:app"]
+# `wsgi:app` because the app/ package shadows a root-level app.py inside the
+# image, which makes `gunicorn app:app` resolve to the package (no Flask
+# instance on it) and every worker dies with "Failed to find attribute 'app'".
+CMD ["sh", "-c", "flask --app app db upgrade && gunicorn -b 0.0.0.0:5000 -w 4 wsgi:app"]
