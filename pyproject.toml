@@ -37,3 +37,8 @@ source = ["app"]
 # regressions, not to measure quality. Raise as coverage grows.
 fail_under = 85
 show_missing = true
+
+[tool.pytest.ini_options]
+# Hard per-test ceiling: a test that blocks (e.g. on a DB lock) fails with a
+# stack dump instead of hanging CI for hours.
+timeout = 60
