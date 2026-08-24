@@ -53,6 +53,10 @@ def replica_app():
     with app.app_context():
         db.create_all()
         yield app
+        # See conftest.py: close pooled connections before DROP so leaked
+        # transactions cannot block on PostgreSQL.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 

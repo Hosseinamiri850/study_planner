@@ -34,6 +34,10 @@ def rl_app():
                             fullname="Locked User"))
         db.session.commit()
         yield app
+        # See conftest.py: close pooled connections before DROP so leaked
+        # transactions cannot block on PostgreSQL.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 

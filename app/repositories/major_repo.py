@@ -6,6 +6,13 @@ directly. Reads may target a replica session; writes always go to the primary.
 
 from app.models import Major
 from app.repositories.base import Repo
+from app.utils.caching import KEY_COURSES_ALL, KEY_MAJORS_TEMPLATE, cache_delete
+
+
+def _invalidate_major_caches():
+    """Major writes dirty the nested template tree and the flat course list
+    (course ordering joins majors)."""
+    cache_delete(KEY_COURSES_ALL, KEY_MAJORS_TEMPLATE)
 
 
 class MajorRepo(Repo):
@@ -54,6 +61,7 @@ class MajorRepo(Repo):
         major = Major(key=key, name_fa=name_fa, name_en=name_en)
         cls._write().add(major)
         cls._write().commit()
+        _invalidate_major_caches()
         return major
 
     @classmethod
@@ -73,8 +81,12 @@ class MajorRepo(Repo):
             return False
         cls._write().delete(major)
         cls._write().commit()
+        _invalidate_major_caches()
         return True
 
     @classmethod
     def commit(cls):
+        """Commit the pending unit of work (seeder batches majors + courses
+        into one transaction) and invalidate the read caches afterwards."""
         cls._write().commit()
+        _invalidate_major_caches()

@@ -160,8 +160,9 @@ def is_available() -> bool:
 # ─── Availability cache ────────────────────────────────────────────────────
 # `is_available()` makes a blocking HTTP request; invoking it from the context
 # processor (which runs on every request) means every page load pays up to
-# 2s of latency. This TTL-based cache holds the value so the network is hit
-# only once per TTL window.
+# 2s of latency. This TTL cache holds the value so the network is hit only
+# once per TTL window. Backed by Redis when REDIS_URL is set (shared across
+# workers), by an in-process dict otherwise.
 _AVAILABILITY_TTL = 60  # seconds
 _availability_cache = {"value": None, "expires_at": 0.0}
 
@@ -173,6 +174,22 @@ def is_available_cached() -> bool:
     network calls are avoided. The `/api/translator-status` route still uses
     `is_available()` directly for a live answer.
     """
+    # Import lazily: this module must stay importable outside app context
+    # (tests stub it directly).
+    from flask import current_app
+
+    try:
+        from app.utils.caching import KEY_TRANSLATOR_AVAILABLE, cache_get, cache_set
+
+        if current_app.config.get("REDIS_URL"):
+            hit, value = cache_get(KEY_TRANSLATOR_AVAILABLE)
+            if hit:
+                return value
+            value = is_available()
+            cache_set(KEY_TRANSLATOR_AVAILABLE, value, _AVAILABILITY_TTL)
+            return value
+    except RuntimeError:
+        pass  # no app context — fall through to in-process cache
     now = time.monotonic()
     if _availability_cache["value"] is not None and now < _availability_cache["expires_at"]:
         return _availability_cache["value"]
@@ -183,6 +200,12 @@ def is_available_cached() -> bool:
 
 
 def reset_availability_cache() -> None:
-    """Clear the cache — for tests."""
+    """Clear the cache — for tests. Safe without app context."""
     _availability_cache["value"] = None
     _availability_cache["expires_at"] = 0.0
+    try:
+        from app.utils.caching import KEY_TRANSLATOR_AVAILABLE, cache_delete
+
+        cache_delete(KEY_TRANSLATOR_AVAILABLE)
+    except RuntimeError:  # no app context
+        pass

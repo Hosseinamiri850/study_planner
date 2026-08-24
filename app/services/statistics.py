@@ -3,7 +3,44 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
+from flask import session
+
 from app.repositories import CourseRepo, MajorRepo, TaskRepo
+from app.utils.caching import cached
+
+# Hot read models shared by every dashboard/admin render. TTL is a safety
+# net only — correctness comes from explicit invalidation on course/major
+# writes (see the repos).
+_COURSES_TTL = 300
+_MAJORS_TTL = 300
+
+
+def _request_lang():
+    try:
+        return session.get("lang", "fa")
+    except RuntimeError:  # outside request context (scripts, some tests)
+        return "fa"
+
+
+@cached("courses", "all", _COURSES_TTL)
+def _courses_rows_cached():
+    """Language-neutral course rows. `display_name()` is request-scoped (it
+    reads the session language), so it must NOT be baked into the cache —
+    the raw fa/en names are cached and rendered per request in
+    `all_courses_list`."""
+    courses = CourseRepo.list_all()
+    seen, result = set(), []
+    for course in courses:
+        if course.key not in seen:
+            seen.add(course.key)
+            result.append({"key": course.key, "name_fa": course.name_fa, "name_en": course.name_en})
+    return result
+
+
+def all_courses_list():
+    rows = _courses_rows_cached()
+    lang = _request_lang()
+    return [{"key": row["key"], "name": row[f"name_{lang}"]} for row in rows]
 
 
 def get_user_stats(user):
@@ -33,16 +70,6 @@ def get_user_stats(user):
     }
 
 
-def all_courses_list():
-    courses = CourseRepo.list_all()
-    seen, result = set(), []
-    for course in courses:
-        if course.key not in seen:
-            seen.add(course.key)
-            result.append({"key": course.key, "name": course.display_name()})
-    return result
-
-
 def course_stats(tasks, courses):
     return {
         course["key"]: {
@@ -55,5 +82,30 @@ def course_stats(tasks, courses):
     }
 
 
+@cached("majors", "template", _MAJORS_TTL)
+def _majors_rows_cached():
+    """Language-neutral major/course tree — same reasoning as
+    `_courses_rows_cached`: names are rendered per request."""
+    return [
+        {
+            "id": major.id,
+            "key": major.key,
+            "name_fa": major.name_fa,
+            "name_en": major.name_en,
+            "courses": [
+                {"id": c.id, "key": c.key, "name_fa": c.name_fa, "name_en": c.name_en}
+                for c in major.courses
+            ],
+        }
+        for major in MajorRepo.list_all()
+    ]
+
+
 def majors_for_template():
-    return MajorRepo.majors_for_template()
+    payload = _majors_rows_cached()
+    lang = _request_lang()
+    for major in payload:
+        major["name"] = major[f"name_{lang}"]
+        for course in major["courses"]:
+            course["name"] = course[f"name_{lang}"]
+    return payload

@@ -96,86 +96,53 @@ Reviewer discover it by accident.
 
 Uplift the CI pipeline per the TODO: Python 3.12 + 3.13 matrix, a pytest
 coverage gate, and a PostgreSQL service-container run of the suite. Also
-fixes a real bug found while touching the workflow (see Decisions).
+fixes two real bugs found along the way: dead CI triggers, and the silent
+PostgreSQL-job hang (see Decisions).
 
 #### Files changed
 
 Modified:
-- `.github/workflows/ci.yml` — branch triggers fixed to include `trunk`
-  (see Decisions); `lint-and-test` becomes a 3.12+3.13 matrix with
-  `pytest --cov` + the coverage gate; new `test-postgresql` job runs the
-  suite against a postgres:16-alpine service container via
-  `TEST_DATABASE_URL`.
-- `tests/conftest.py` — `TestConfig.SQLALCHEMY_DATABASE_URI` now reads
-  `TEST_DATABASE_URL` from the env, falling back to in-memory SQLite.
-- `pyproject.toml` — `[tool.coverage.run]`/`[tool.coverage.report]`:
-  source=app, `fail_under = 85`, show_missing.
-- `requirements-dev.txt` — adds `pytest-cov>=5.0.0`.
+- `.github/workflows/ci.yml` — triggers fixed to include `trunk`;
+  3.12+3.13 matrix with coverage gate; new `test-postgresql` job
+  (20-min cap) running pytest with `--timeout=60 --timeout-method=thread`
+  so any blocked test fails with a stack dump instead of hanging silently.
+- `tests/conftest.py` — `TEST_DATABASE_URL` env seam for the PG job;
+  teardown now calls `db.session.remove()` + `db.engine.dispose()` before
+  `db.drop_all()` (ROOT CAUSE of the first-run hang: PostgreSQL blocks
+  DROP TABLE while any pooled connection holds a leaked transaction's
+  locks — SQLite never exhibits this). Same treatment applied to every
+  custom app fixture (`test_rate_limiting.py`, `test_replication_seam.py`,
+  `test_security_headers.py`).
+- `pyproject.toml` — coverage config + `fail_under = 85` + default
+  `timeout = 60` for pytest.
+- `requirements-dev.txt` — adds `pytest-cov>=5.0.0`, `pytest-timeout>=2.3.0`.
 
 #### Decisions made
 
-- **Bug fix bundled: dead CI triggers.** The workflow watched `master`, but
-  the default branch is `trunk` — the last CI run was 2026-08-04; every push
-  since (including TASK-028..039) ran with no CI. Triggers now list
-  `trunk` first (`master`/`production-hardening` kept for old branches).
-- **Coverage gate at 85**, measured locally at **92.43%** — floor catches
-  regressions without being so high that legitimate refactors fail. The
-  TODO says "start low, raise over time"; 85 against an existing 92% is
-  deliberately tighter than "low" because the headroom is real.
-- **PG job runs plain `pytest -q`** (no cov): dialect/tz behavior is the
-  point; coverage comes from the primary matrix job.
-- **No ruff format step**: the repo has not adopted a formatter (house
-  style is terse hand-wrapped lines); adding `ruff format --check` would
-  fail immediately. Revisit if formatting is adopted.
-- **Env-var seam in TestConfig** rather than a second config class: one
-  knob, zero test-code duplication.
-
-#### Migration review (if schema touched)
-
-N/A — no schema change.
-
-#### Tests
-
-- No application tests added; the change is pipeline + config.
-- Full suite with the gate active:
-  ```
-  Required test coverage of 85.0% reached. Total coverage: 92.43%
-  238 passed, 67 warnings in 37.12s
-  ```
-- Failures during development: one — conftest used `os.environ` without
-  importing `os`; caught immediately by collection error, fixed.
-- PostgreSQL job verified by inspection only (no local PG container here);
-  first real proof lands when this PR runs. Flag: if the PG job fails on
-  PR CI, the likely culprit is a SQLite-only assumption in a fixture, not
-  the workflow YAML.
-
-#### Lint
-
-- `ruff check app/ tests/`: `All checks passed!`
-
-#### Reviewer notes
-
-- The `fail-fast: false` on the matrix means a 3.12 failure does not cancel
-  the 3.13 run — full signal per PR, slightly more CI minutes.
-- Coverage measures `app/` only; `tests/` excluded by construction.
-- The 67 warnings are pre-existing sqlite ResourceWarnings surfaced by the
-  cov plugin's unraisable-exception hook — present before this change,
-  tracked as noise, out of scope.
-
-#### What was NOT done
-
-- `ruff format --check` (no formatter adopted — see Decisions).
-- Coverage upload to Codecov/Artifacts — single-number gate suffices now;
-  add trend tooling if the team wants dashboards.
-- Migration smoke-run inside the PG job (running `flask db upgrade` against
-  the service DB before pytest) — worth adding when TASK-033 touches Docker;
-  noted there.
+- **Dead CI triggers fixed**: workflow watched `master`, default branch is
+  `trunk` — no CI had run since 2026-08-04.
+- **Coverage gate at 85**, measured 92%+ at landing.
+- **Hang diagnosis path**: first PG run hung 6h with zero output; added
+  pytest-timeout → second run pinpointed the blocking frame to conftest's
+  `db.drop_all()`. Fix = dispose connections before DDL, plus the timeout
+  stays as a permanent tripwire.
 
 ---
 
-## Prior results
+## Prior results (merged via their own PRs)
 
-### TASK-039 — Database Access Layer + read/write split config
+### TASK-029 — Security headers + cookie hardening (PR #18)
+
+after_request hook adds HSTS/CSP/nosniff/Referrer-Policy everywhere; cookie
+HttpOnly + SameSite=Lax always, Secure env-gated; lifetime 7 days. CSP
+permissive until UI migration removes inline handlers/scripts. 8 tests.
+
+### TASK-025 — Redis caching layer before the database (PR #17)
+
+Thin cache over hot read models with data-layer invalidation; language-
+neutral rows; graceful degradation without REDIS_URL. 13 tests.
+
+### TASK-039 — Database Access Layer + read/write split config (merged to trunk as 84c95f2)
 
 **Implementer:** Claude (implementer role)
 **Date:** 2026-08-24

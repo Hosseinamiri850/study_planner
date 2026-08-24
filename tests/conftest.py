@@ -47,6 +47,12 @@ def app():
     with app.app_context():
         db.create_all()
         yield app
+        # PostgreSQL blocks DROP TABLE while any connection holds a matching
+        # lock; a session left mid-transaction by a test would hang drop_all
+        # forever (seen as a silent 6h CI hang). Close every pooled
+        # connection first so leaked transactions cannot outlive the test.
+        db.session.remove()
+        db.engine.dispose()
         db.drop_all()
 
 
