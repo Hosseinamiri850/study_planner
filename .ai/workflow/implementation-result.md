@@ -134,52 +134,30 @@ Modified:
   TestConfig: the hardening keys must be exercised as shipped, not at
   Flask defaults. TestConfig intentionally stays minimal.
 
-#### Migration review (if schema touched)
+---
 
-N/A — no schema change.
+### TASK-025 — Redis caching layer before the database (merged via PR #17)
 
-#### Tests
+**Implementer:** Claude (implementer role)
+**Date:** 2026-08-24
+**Task source:** `.ai/TODO.md` TASK-025
 
-- Added: `tests/test_security_headers.py` (8 tests listed above).
-- Full suite:
-  ```
-  246 passed, 1 warning in 38.56s
-  ```
-  (238 pre-existing + 8 new; branch predates PR #17.)
-- Failures during development: four, all instructive — direct
-  `app.config[key]` lookups crashed custom test configs (switched to skip-
-  if-absent); HSTS string missed its `max-age=` prefix; two tests asserted
-  against Flask defaults instead of the real Config (moved to the
-  hardened fixture).
+#### Scope
 
-#### Lint
+Thin Redis cache in front of hot read paths with explicit invalidation at
+the data-access layer (the reason this task waited on TASK-039). No-op when
+`REDIS_URL` is unset; graceful degradation when Redis is down. Per-user
+statistics payload intentionally NOT cached (single grouped SELECT already).
 
-- `ruff check app/ tests/`: `All checks passed!`
-
-#### Reviewer notes
-
-- The CSP skip-if-absent behavior means a config object forgetting the CSP
-  keys silently ships no CSP header. Acceptable (fail-open on header only);
-  flag if you prefer fail-closed with a default-deny fallback.
-- HSTS is sent even on plain-HTTP dev responses — browsers ignore it there,
-  so it is inert without TLS. No harm, but worth knowing.
-- `PERMANENT_SESSION_LIFETIME` only bites when `session.permanent` is set;
-  nothing sets it today. The value is declared now so login flows can opt
-  into "remember me" later without another config pass.
-
-#### What was NOT done
-
-- Nonces/hashes to drop `'unsafe-inline'` (UI-migration scope).
-- `Permissions-Policy` / `X-Frame-Options` beyond the TODO list — can add
-  `frame-ancestors 'none'` inside CSP later if clickjacking matters here.
-- README documentation of the new env vars (`SESSION_COOKIE_SECURE`,
-  `HSTS_MAX_AGE`) — batch with the REDIS_URL doc pass after reviews.
+Key decisions: language-neutral rows cached (names rendered per request);
+invalidation lives in CourseRepo/MajorRepo writes; TTLs are safety nets;
+no hard redis dependency (lazy import). 13 tests in `tests/test_caching.py`.
 
 ---
 
-## Prior result (merged to trunk as 84c95f2)
+## Prior results
 
-### TASK-039 — Database Access Layer + read/write split config
+### TASK-039 — Database Access Layer + read/write split config (merged to trunk as 84c95f2)
 
 **Implementer:** Claude (implementer role)
 **Date:** 2026-08-24

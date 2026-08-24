@@ -23,6 +23,10 @@ class Config:
     DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     # Rate-limit storage URI: Redis when set, in-memory otherwise.
     RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "memory://")
+    # Application cache (TASK-025). Distinct from RATELIMIT_STORAGE_URI so the
+    # rate limiter and the data cache can use different Redis DBs. Empty =
+    # no caching; every read goes to the database.
+    REDIS_URL = os.environ.get("REDIS_URL", "")
     # Auth endpoints are brute-force targets — allow 5 attempts per minute.
     RATELIMIT_AUTH = "5 per minute"
     # Sentry is optional: blank DSN → SDK never initializes. Set via env in prod.
