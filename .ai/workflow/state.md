@@ -7,16 +7,20 @@ the verdict. Keep it short — long-form detail goes in `implementation-result.m
 
 ## Current state
 
-**Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW` (post-review fixes applied)
-**Task:** TASK-039 — Database Access Layer + read/write split config
+**Status:** `IMPLEMENTATION_DONE — PENDING_REVIEW`
+**Task:** TASK-031 — CI quality uplift
 **Implementer:** Claude (implementer role)
-**Reviewer:** Claude (reviewer role) — first pass done, findings fixed, re-review requested
-**Started:** 2026-08-12
+**Reviewer:** —
+**Started:** 2026-08-24
 **Last updated:** 2026-08-24
 
-First review complete: 2 MAJOR + 3 MINOR + 5 NIT found and all fixed.
-238 tests pass, ruff clean. Reviewer: verify the five fix groups in the
-history entry below and write the verdict to `.ai/reviews/latest.md`.
+Branch: `ci/quality-uplift` (off trunk @ 84c95f2). 238 tests pass,
+coverage 92.43% vs 85% gate, ruff clean. See `implementation-result.md`.
+
+Open PRs: #17 (TASK-025 Redis cache), #18 (TASK-029 security headers),
+both pending review. TASK-027 waits on #17.
+
+Note: TASK-039 was merged to trunk directly (84c95f2) on user instruction.
 
 ---
 

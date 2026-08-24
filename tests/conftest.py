@@ -1,3 +1,4 @@
+import os
 import sys
 import uuid
 from datetime import date
@@ -28,7 +29,11 @@ def _stub_translator_availability():
 
 class TestConfig:
     SECRET_KEY = "test-secret-key"
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    # TEST_DATABASE_URL lets CI run the suite against PostgreSQL (service
+    # container) instead of in-memory SQLite; unset keeps the fast default.
+    SQLALCHEMY_DATABASE_URI = os.environ.get(
+        "TEST_DATABASE_URL", "sqlite:///:memory:"
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = True
