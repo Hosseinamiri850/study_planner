@@ -39,6 +39,13 @@ class MajorRepo(Repo):
         return cls._read().query(Major).order_by(Major.name_en).all()
 
     @classmethod
+    def list_courses_for_major(cls, major_id):
+        """Courses of a major ordered by English name (display order)."""
+        from app.models import Course
+
+        return cls._read().query(Course).filter(Course.major_id == major_id).order_by(Course.name_en).all()
+
+    @classmethod
     def majors_for_template(cls):
         """List shape the templates expect: majors with nested courses."""
         return [

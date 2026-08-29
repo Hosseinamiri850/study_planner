@@ -5,9 +5,11 @@ from app.config import Config
 from app.extensions import csrf, limiter
 from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
-from app.repositories import CourseRepo, TaskRepo, UserRepo
+from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
+from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import (
+    api_admin_required,
     api_auth_required,
     create_access_token,
     issue_refresh_token,
@@ -98,6 +100,214 @@ def refresh():
     # rotate_refresh_token -> issue_refresh_token already committed (revocation
     # + new row land in that single transaction); no extra commit needed.
     return jsonify({"access_token": access, "refresh_token": refresh_tok})
+
+
+@api_bp.route("/auth/logout", methods=["POST"])
+@csrf.exempt
+@api_auth_required
+def logout():
+    """Revoke the presented refresh token (single-session logout).
+
+    Requires a valid access token AND the matching refresh token — access
+    tokens are stateless (15 min), so revoking the refresh token ends the
+    token family: the client cannot mint further access tokens after the
+    current one expires. Pass the refresh token as JSON `refresh_token`.
+    Idempotent: revoking an already-revoked/unknown token still returns 204
+    (no information leak, logout succeeds either way).
+    """
+    data = request.get_json(silent=True) or {}
+    signed = str(data.get("refresh_token", "")).strip()
+    if signed:
+        RefreshTokenRepo.revoke_presented(g.api_user.id, signed)
+    return "", 204
+
+
+@api_bp.route("/me", methods=["GET"])
+@api_auth_required
+def me():
+    """Current user profile from the Bearer access token."""
+    user = g.api_user
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "theme": user.theme, "created_at": user.created_at.isoformat()}})
+
+
+@api_bp.route("/me", methods=["PUT"])
+@csrf.exempt
+@api_auth_required
+def update_me():
+    """Update the current user's profile.
+
+    `fullname` and `theme` are direct updates. Password change requires the
+    current password (`current_password`) plus the new `password` (min 8
+    chars); changing the password revokes every outstanding refresh token.
+    """
+    user = UserRepo.get_for_write(g.api_user.id)
+    if user is None:
+        return _error("User not found.", 401)
+    data = request.get_json(silent=True) or {}
+
+    if "fullname" in data:
+        fullname = str(data["fullname"]).strip()
+        if not fullname or len(fullname) > 150:
+            return _error("fullname must be 1-150 characters.")
+        user.fullname = fullname
+
+    if "theme" in data:
+        theme = str(data["theme"])
+        if theme not in {"dark", "light"}:
+            return _error("theme must be dark or light.")
+        user.theme = theme
+
+    if "password" in data:
+        current_password = str(data.get("current_password", ""))
+        new_password = str(data["password"])
+        if not check_password_hash(user.password, current_password):
+            return _error("Current password is incorrect.", 403)
+        if not valid_password(new_password):
+            return _error("Password must be at least 8 characters.")
+        user.password = generate_password_hash(new_password)
+        # The password changed: every outstanding refresh token is no longer
+        # trustworthy, revoke them (the presented access token stays valid
+        # until its 15-minute TTL — stateless by design).
+        RefreshTokenRepo.revoke_all_for_user(user.id)
+
+    UserRepo.commit()
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "theme": user.theme, "created_at": user.created_at.isoformat()}})
+
+
+def _course_payload(course):
+    return {"id": course.id, "key": course.key, "name_fa": course.name_fa, "name_en": course.name_en, "major_id": course.major_id}
+
+
+def _major_payload(major):
+    return {"id": major.id, "key": major.key, "name_fa": major.name_fa, "name_en": major.name_en, "courses": [_course_payload(c) for c in MajorRepo.list_courses_for_major(major.id)]}
+
+
+@api_bp.route("/courses", methods=["GET"])
+@api_auth_required
+def list_courses():
+    """All reference courses (read-only for any authenticated client).
+    Language-neutral: both fa/en names are returned; the client renders one."""
+    return jsonify({"courses": [_course_payload(c) for c in CourseRepo.list_all()]})
+
+
+@api_bp.route("/majors", methods=["GET"])
+@api_auth_required
+def list_majors():
+    """Major/course tree (read-only for any authenticated client).
+    Language-neutral: both fa/en names are returned."""
+    return jsonify({"majors": [_major_payload(m) for m in MajorRepo.list_all()]})
+
+
+@api_bp.route("/courses", methods=["POST"])
+@csrf.exempt
+@api_admin_required
+def create_course_api():
+    data = request.get_json(silent=True) or {}
+    name_fa = str(data.get("name_fa", "")).strip()
+    name_en = str(data.get("name_en", "")).strip()
+    raw_major_id = data.get("major_id")
+    try:
+        major = MajorRepo.get(int(raw_major_id)) if raw_major_id is not None else None
+    except (TypeError, ValueError):
+        major = None
+    if not name_fa or not name_en or major is None:
+        return _error("name_fa, name_en, and a valid major_id are required.")
+    key = str(data.get("key") or name_en.lower().replace(" ", "_")).strip()
+    if not key:
+        return _error("key must not be empty.")
+    if CourseRepo.find_by_key_major(key, major.id):
+        return _error("A course with this key already exists for the major.", 409)
+    course = CourseRepo.create(key=key, name_fa=name_fa, name_en=name_en, major_id=major.id)
+    return jsonify({"course": _course_payload(course)}), 201
+
+
+@api_bp.route("/courses/<int:course_id>", methods=["PUT"])
+@csrf.exempt
+@api_admin_required
+def update_course_api(course_id):
+    course = CourseRepo.get_for_write(course_id)
+    if course is None:
+        return _error("Course not found.", 404)
+    data = request.get_json(silent=True) or {}
+    if "name_fa" in data:
+        name_fa = str(data["name_fa"]).strip()
+        if not name_fa:
+            return _error("name_fa must not be empty.")
+        course.name_fa = name_fa
+    if "name_en" in data:
+        name_en = str(data["name_en"]).strip()
+        if not name_en:
+            return _error("name_en must not be empty.")
+        course.name_en = name_en
+    CourseRepo.commit()
+    return jsonify({"course": _course_payload(course)})
+
+
+@api_bp.route("/courses/<int:course_id>", methods=["DELETE"])
+@csrf.exempt
+@api_admin_required
+def delete_course_api(course_id):
+    """Archive-style delete: task rows survive with their legacy course_key
+    (CourseRepo.delete_preserve_tasks). Matches the dashboard delete flow."""
+    if CourseRepo.delete_preserve_tasks(course_id):
+        return "", 204
+    return _error("Course not found.", 404)
+
+
+@api_bp.route("/majors", methods=["POST"])
+@csrf.exempt
+@api_admin_required
+def create_major_api():
+    data = request.get_json(silent=True) or {}
+    name_fa = str(data.get("name_fa", "")).strip()
+    name_en = str(data.get("name_en", "")).strip()
+    if not name_fa or not name_en:
+        return _error("name_fa and name_en are required.")
+    key = str(data.get("key") or name_en.lower().replace(" ", "_")).strip()
+    if not key:
+        return _error("key must not be empty.")
+    if MajorRepo.find_by_key(key):
+        return _error("A major with this key already exists.", 409)
+    major = MajorRepo.create(key=key, name_fa=name_fa, name_en=name_en)
+    return jsonify({"major": _major_payload(major)}), 201
+
+
+@api_bp.route("/majors/<int:major_id>", methods=["PUT"])
+@csrf.exempt
+@api_admin_required
+def update_major_api(major_id):
+    major = MajorRepo.get_for_write(major_id)
+    if major is None:
+        return _error("Major not found.", 404)
+    data = request.get_json(silent=True) or {}
+    if "name_fa" in data:
+        name_fa = str(data["name_fa"]).strip()
+        if not name_fa:
+            return _error("name_fa must not be empty.")
+        major.name_fa = name_fa
+    if "name_en" in data:
+        name_en = str(data["name_en"]).strip()
+        if not name_en:
+            return _error("name_en must not be empty.")
+        major.name_en = name_en
+    MajorRepo.commit()
+    return jsonify({"major": _major_payload(major)})
+
+
+@api_bp.route("/majors/<int:major_id>", methods=["DELETE"])
+@csrf.exempt
+@api_admin_required
+def delete_major_api(major_id):
+    """Protected key `computer_science` stays undeletable — matches the
+    dashboard admin flow's guard."""
+    major = MajorRepo.get(major_id)
+    if major is None:
+        return _error("Major not found.", 404)
+    if major.key == "computer_science":
+        return _error("The default major cannot be deleted.", 409)
+    if MajorRepo.delete(major_id):
+        return "", 204
+    return _error("Major not found.", 404)
 
 
 @api_bp.route("/tasks", methods=["GET"])
