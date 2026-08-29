@@ -37,13 +37,17 @@ _ANCHOR_TIME = dt.time(12, 0)  # neutral midday UTC marker on the task's day
 
 
 def _synthesized_rows(conn):
-    """Rows (task_id, hours, created_at) for done tasks with no sessions."""
+    """Rows (task_id, hours, created_at) for done tasks with no sessions.
+
+    `done = :done` goes through a bind param (not the literal 1) so the
+    boolean comparison type-checks on PostgreSQL (`done = 1` has no
+    operator there); SQLite accepts it too."""
     eligible = sa.text(
         "SELECT t.id, t.hours, t.created_at FROM tasks t "
-        "WHERE t.done = 1 AND NOT EXISTS "
+        "WHERE t.done = :done AND NOT EXISTS "
         "(SELECT 1 FROM study_sessions s WHERE s.task_id = t.id)"
     )
-    return conn.execute(eligible).fetchall()
+    return conn.execute(eligible, {"done": True}).fetchall()
 
 
 def upgrade():
@@ -69,10 +73,10 @@ def downgrade():
     # == hours * 3600). Delete those sessions; real tracked rows survive.
     find = sa.text(
         "SELECT s.id, s.started_at, s.duration, t.hours FROM study_sessions s "
-        "JOIN tasks t ON t.id = s.task_id WHERE t.done = 1"
+        "JOIN tasks t ON t.id = s.task_id WHERE t.done = :done"
     )
     delete = sa.text("DELETE FROM study_sessions WHERE id = :sid")
-    for sid, started_at, duration, hours in conn.execute(find):
+    for sid, started_at, duration, hours in conn.execute(find, {"done": True}):
         started = started_at if isinstance(started_at, dt.datetime) else dt.datetime.fromisoformat(str(started_at))
         anchored = started.time() == _ANCHOR_TIME and started == started.replace(microsecond=0)
         if anchored and duration is not None and hours is not None and abs(duration - int(round(hours * 3600))) < 1:
