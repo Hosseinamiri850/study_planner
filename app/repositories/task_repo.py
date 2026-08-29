@@ -52,35 +52,60 @@ class TaskRepo(Repo):
         )
 
     @classmethod
-    def sum_hours_by_day_for_user(cls, user_id):
-        """SQL-aggregated completed hours by `created_at` day for a user.
+    def sum_seconds_by_day_for_user(cls, user_id):
+        """Study time by day for a user, from StudySession durations.
 
-        Returns a list of (hours, day) rows — same signal as the current
-        `services/statistics.py` (kept here as the data-access-level hook for
-        TASK-027 to later switch to StudySession.duration).
+        The correct hours signal (TASK-027): actual tracked session time,
+        bucketed by the UTC day the session STARTED, not the task's
+        estimated hours on its created_at date. Open sessions (duration
+        NULL) and their days are excluded. `day` comes from func.date(),
+        which is TEXT on SQLite and DATE on PostgreSQL — callers normalize
+        via statistics._coerce_date.
         """
         return (
             cls._read()
             .query(
-                func.coalesce(func.sum(Task.hours), 0.0).label("hours"),
-                Task.created_at.label("day"),
+                func.coalesce(func.sum(StudySession.duration), 0).label("seconds"),
+                func.date(StudySession.started_at).label("day"),
             )
-            .filter(Task.user_id == user_id, Task.done.is_(True))
-            .group_by(Task.created_at)
+            .select_from(StudySession)
+            .join(Task, StudySession.task_id == Task.id)
+            .filter(Task.user_id == user_id, StudySession.duration.isnot(None))
+            .group_by(func.date(StudySession.started_at))
             .all()
         )
 
     @classmethod
-    def system_sum_hours_by_day(cls):
-        """System-wide completed hours by day (admin panel)."""
+    def sum_seconds_by_course_for_user(cls, user_id):
+        """Study time per course key (legacy `course_key` mirror) for a user.
+        Same semantics as `sum_seconds_by_day_for_user`."""
         return (
             cls._read()
             .query(
-                func.coalesce(func.sum(Task.hours), 0.0).label("hours"),
-                Task.created_at.label("day"),
+                Task.course_key.label("course_key"),
+                func.coalesce(func.sum(StudySession.duration), 0).label("seconds"),
             )
-            .filter(Task.done.is_(True))
-            .group_by(Task.created_at)
+            .select_from(StudySession)
+            .join(Task, StudySession.task_id == Task.id)
+            .filter(Task.user_id == user_id, StudySession.duration.isnot(None))
+            .group_by(Task.course_key)
+            .all()
+        )
+
+    @classmethod
+    def system_sum_seconds_by_day(cls):
+        """System-wide study time by day (admin panel). Same semantics as
+        `sum_seconds_by_day_for_user`, no user filter."""
+        return (
+            cls._read()
+            .query(
+                func.coalesce(func.sum(StudySession.duration), 0).label("seconds"),
+                func.date(StudySession.started_at).label("day"),
+            )
+            .select_from(StudySession)
+            .join(Task, StudySession.task_id == Task.id)
+            .filter(StudySession.duration.isnot(None))
+            .group_by(func.date(StudySession.started_at))
             .all()
         )
 

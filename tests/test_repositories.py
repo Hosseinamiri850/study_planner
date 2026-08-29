@@ -6,6 +6,8 @@ no replica is configured here — the read/write split seam is exercised in
 `test_replication_seam.py`.
 """
 
+from datetime import date
+
 from app.repositories import (
     CourseRepo,
     MajorRepo,
@@ -125,19 +127,50 @@ class TestTaskRepo:
         session = TaskRepo.start_session(task)
         assert TaskRepo.get_session(session.id).id == session.id
 
-    def test_sum_hours_by_day_for_user(self, create_user, create_task):
-        user = create_user()
-        t1 = create_task(user=user, hours=2.0, done=True)
-        create_task(user=user, hours=3.5, done=True)
-        # Both tasks share today's created_at; one group, sum 5.5
-        rows = TaskRepo.sum_hours_by_day_for_user(user.id)
-        assert len(rows) >= 1
-        today_row = next(r for r in rows if r.day == t1.created_at)
-        assert today_row.hours == 5.5
+    def test_sum_seconds_by_day_for_user(self, create_user, create_task, create_study_session):
+        from datetime import datetime, timedelta
 
-    def test_system_sum_hours_by_day(self, create_user, create_task):
-        create_task(user=create_user(), hours=1.0, done=True)
-        rows = TaskRepo.system_sum_hours_by_day()
+        user = create_user()
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        task = create_task(user=user, hours=2.0, done=True)
+        create_study_session(task=task, duration=3600, started_at=datetime(today.year, today.month, today.day, 10))
+        create_study_session(task=task, duration=1800, started_at=datetime(yesterday.year, yesterday.month, yesterday.day, 10))
+        rows = TaskRepo.sum_seconds_by_day_for_user(user.id)
+        by_day = {str(r.day): r.seconds for r in rows}
+        assert by_day[str(today)] == 3600
+        assert by_day[str(yesterday)] == 1800
+
+    def test_sum_seconds_by_day_excludes_open_sessions(self, create_user, create_task, create_study_session):
+        from datetime import datetime
+
+        user = create_user()
+        task = create_task(user=user, done=True)
+        create_study_session(task=task, duration=None, started_at=datetime(date.today().year, date.today().month, date.today().day, 10), ended_at=None)
+        rows = TaskRepo.sum_seconds_by_day_for_user(user.id)
+        assert all(r.day is None or r.seconds == 0 for r in rows)
+
+    def test_sum_seconds_by_course_for_user(self, create_user, create_course, create_task, create_study_session):
+        from datetime import datetime
+
+        user = create_user()
+        course = create_course()
+        task1 = create_task(user=user, course=course, done=True)
+        task2 = create_task(user=user, course=course, done=True)
+        noon = datetime(date.today().year, date.today().month, date.today().day, 12)
+        create_study_session(task=task1, duration=3600, started_at=noon)
+        create_study_session(task=task2, duration=900, started_at=noon)
+        rows = TaskRepo.sum_seconds_by_course_for_user(user.id)
+        by_key = {r.course_key: r.seconds for r in rows}
+        assert by_key[course.key] == 4500
+
+    def test_system_sum_seconds_by_day(self, create_user, create_task, create_study_session):
+        from datetime import datetime
+
+        task = create_task(user=create_user(), hours=1.0, done=True)
+        noon = datetime(date.today().year, date.today().month, date.today().day, 12)
+        create_study_session(task=task, duration=3600, started_at=noon)
+        rows = TaskRepo.system_sum_seconds_by_day()
         assert len(rows) >= 1
 
 

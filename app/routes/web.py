@@ -91,7 +91,7 @@ def dashboard():
     for other_user in UserRepo.list_non_admin():
         other_stats = get_user_stats(other_user)
         users.append({"username": other_user.username, "fullname": other_user.fullname, "total_tasks": other_stats["total_tasks"], "done_tasks": other_stats["total_done"], "today_hours": other_stats["today_hours"], "is_current": other_user.id == user.id})
-    return render_template("dashboard.html", current_user=user.username, fullname=user.fullname, courses=courses, course_stats=course_stats(stats["tasks"], courses), all_users=users, theme=user.theme, majors=majors_for_template(), today=str(date.today()), **stats)
+    return render_template("dashboard.html", current_user=user.username, fullname=user.fullname, courses=courses, course_stats=course_stats(stats["tasks"], courses, stats["course_hours"]), all_users=users, theme=user.theme, majors=majors_for_template(), today=str(date.today()), **stats)
 
 
 def _handle_dashboard_action(user):
@@ -174,4 +174,4 @@ def view_user(username):
         flash(t("admin.unauthorized"), "error")
         return redirect(url_for("web.dashboard"))
     stats, courses = get_user_stats(target), all_courses_list()
-    return render_template("view_user.html", viewed_user=target.username, fullname=target.fullname, courses=courses, course_stats=course_stats(stats["tasks"], courses), is_own_profile=target.id == viewer.id, theme=viewer.theme, today=str(date.today()), **stats)
+    return render_template("view_user.html", viewed_user=target.username, fullname=target.fullname, courses=courses, course_stats=course_stats(stats["tasks"], courses, stats["course_hours"]), is_own_profile=target.id == viewer.id, theme=viewer.theme, today=str(date.today()), **stats)

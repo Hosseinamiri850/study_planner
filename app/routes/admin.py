@@ -1,4 +1,3 @@
-from collections import defaultdict
 from datetime import date, timedelta
 
 from flask import Blueprint, redirect, render_template, request, url_for
@@ -7,7 +6,7 @@ from werkzeug.security import generate_password_hash
 from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
 from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.routes.web import _create_course, _create_major
-from app.services.statistics import majors_for_template
+from app.services.statistics import hours_map_by_day, majors_for_template
 from app.utils.auth import admin_required
 from app.utils.validation import valid_password
 
@@ -22,21 +21,17 @@ def admin_panel():
         return redirect(url_for("admin.admin_panel"))
 
     users = UserRepo.list_non_admin()
-    today, week_start = date.today(), date.today() - timedelta(days=7)
+    today = date.today()
     users_stats = []
     for user in users:
         tasks = TaskRepo.list_for_user_raw(user.id)
         completed = [task for task in tasks if task.done]
-        users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": sum(task.hours for task in completed if task.created_at == today), "week_hours": sum(task.hours for task in completed if task.created_at >= week_start), "total_hours": sum(task.hours for task in completed), "created_at": str(user.created_at)})
-    # System-wide hours-by-day via a single grouped SQL query instead of
+        # Tracked session time (TASK-027), not estimated task hours.
+        hours_by_day = hours_map_by_day(TaskRepo.sum_seconds_by_day_for_user(user.id))
+        users_stats.append({"username": user.username, "fullname": user.fullname, "total_tasks": len(tasks), "done_tasks": len(completed), "today_hours": hours_by_day[today], "week_hours": sum(hours for day, hours in hours_by_day.items() if day > today - timedelta(days=7)), "total_hours": sum(hours_by_day.values()), "created_at": str(user.created_at)})
+    # System-wide study-time-by-day via a single grouped SQL query instead of
     # loading every completed task and scanning 30 days in Python.
-    rows = (
-        TaskRepo.system_sum_hours_by_day()
-    )
-    hours_by_day = defaultdict(float)
-    for row in rows:
-        if row.day is not None:
-            hours_by_day[row.day] += row.hours or 0
+    hours_by_day = hours_map_by_day(TaskRepo.system_sum_seconds_by_day())
     system_week_hours, system_month_hours = {}, {}
     for offset in range(30):
         day = today - timedelta(days=offset)

@@ -144,28 +144,39 @@ class TestStatisticsService:
         assert stats["total_week_hours"] == 0
         assert stats["total_month_hours"] == 0
 
-    def test_get_user_stats_with_tasks(self, app, create_user, create_task):
+    def test_get_user_stats_with_tasks(self, app, create_user, create_task, create_study_session):
+        from datetime import datetime
+
         from flask import session
         with app.test_request_context():
             session["lang"] = "fa"
             user = create_user()
             today = date.today()
-            create_task(user=user, done=True, hours=2.0, created_at=today)
-            create_task(user=user, done=True, hours=1.5, created_at=today)
+            noon = datetime(today.year, today.month, today.day, 12)
+            task1 = create_task(user=user, done=True, hours=2.0, created_at=today)
+            task2 = create_task(user=user, done=True, hours=1.5, created_at=today)
             create_task(user=user, done=False, hours=3.0)
+            create_study_session(task=task1, duration=3600, started_at=noon, ended_at=noon)
+            create_study_session(task=task2, duration=1800, started_at=noon, ended_at=noon)
             stats = get_user_stats(user)
             assert stats["total_tasks"] == 3
             assert stats["total_done"] == 2
-            assert stats["today_hours"] == 3.5
+            assert stats["today_hours"] == 1.5  # tracked time, not estimates
 
-    def test_get_user_stats_week_calculation(self, app, create_user, create_task):
+    def test_get_user_stats_week_calculation(self, app, create_user, create_task, create_study_session):
+        from datetime import datetime
+
         with app.test_request_context():
             user = create_user()
             today = date.today()
             week_ago = today - timedelta(days=6)
             old_day = today - timedelta(days=10)
-            create_task(user=user, done=True, hours=1.0, created_at=week_ago)
-            create_task(user=user, done=True, hours=2.0, created_at=old_day)
+            noon_w = datetime(week_ago.year, week_ago.month, week_ago.day, 12)
+            noon_o = datetime(old_day.year, old_day.month, old_day.day, 12)
+            task_week = create_task(user=user, done=True, created_at=week_ago)
+            task_old = create_task(user=user, done=True, created_at=old_day)
+            create_study_session(task=task_week, duration=3600, started_at=noon_w, ended_at=noon_w)
+            create_study_session(task=task_old, duration=7200, started_at=noon_o, ended_at=noon_o)
             stats = get_user_stats(user)
             assert stats["total_week_hours"] == 1.0
             assert stats["total_month_hours"] == 3.0
@@ -201,10 +212,10 @@ class TestStatisticsService:
             create_task(user=user, course=course, done=False, hours=2.0)
             tasks = user.tasks.all()
             courses = [{"key": "py_stats", "name": "پایتون"}]
-            stats = course_stats(tasks, courses)
+            stats = course_stats(tasks, courses, {"py_stats": 1.5})
             assert stats["py_stats"]["total"] == 3
             assert stats["py_stats"]["done"] == 2
-            assert stats["py_stats"]["hours"] == 8.0
+            assert stats["py_stats"]["hours"] == 1.5  # from course_hours map
 
     def test_majors_for_template(self, app, create_major, create_course):
         with app.test_request_context():

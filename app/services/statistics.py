@@ -1,7 +1,7 @@
 """Read-model helpers for dashboard and administration statistics."""
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import session
 
@@ -14,12 +14,43 @@ from app.utils.caching import cached
 _COURSES_TTL = 300
 _MAJORS_TTL = 300
 
+SECONDS_PER_HOUR = 3600.0
+
 
 def _request_lang():
     try:
         return session.get("lang", "fa")
     except RuntimeError:  # outside request context (scripts, some tests)
         return "fa"
+
+
+def _coerce_date(value):
+    """Normalize a day bucket to `date`. func.date() yields TEXT on SQLite
+    and DATE (datetime.date) on PostgreSQL; rows round-trip both ways."""
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value)[:10])
+
+
+def hours_map_by_day(rows):
+    """(seconds, day) repo rows -> {date: hours} with open sessions (NULL
+    duration summed as 0 by COALESCE) collapsed correctly."""
+    hours = defaultdict(float)
+    for row in rows:
+        if row.day is None:
+            continue
+        hours[_coerce_date(row.day)] += (row.seconds or 0) / SECONDS_PER_HOUR
+    return hours
+
+
+def _hours_by_course(rows):
+    """(course_key, seconds) repo rows -> {course_key: hours}."""
+    hours = defaultdict(float)
+    for row in rows:
+        hours[row.course_key] += (row.seconds or 0) / SECONDS_PER_HOUR
+    return hours
 
 
 @cached("courses", "all", _COURSES_TTL)
@@ -47,11 +78,10 @@ def get_user_stats(user):
     today = date.today()
     tasks = TaskRepo.list_for_user_raw(user.id)
     completed = [task for task in tasks if task.done]
-    rows = TaskRepo.sum_hours_by_day_for_user(user.id)
-    hours_by_day = defaultdict(float)
-    for row in rows:
-        if row.day is not None:
-            hours_by_day[row.day] += row.hours or 0
+    # Hours come from tracked StudySession time (TASK-027), bucketed by the
+    # day each session started — not estimated task hours on created_at.
+    hours_by_day = hours_map_by_day(TaskRepo.sum_seconds_by_day_for_user(user.id))
+    course_hours = _hours_by_course(TaskRepo.sum_seconds_by_course_for_user(user.id))
     week_hours = {str(today - timedelta(days=offset)): hours_by_day[today - timedelta(days=offset)] for offset in range(7)}
     month_hours = {
         str(day): hours
@@ -67,16 +97,21 @@ def get_user_stats(user):
         "total_week_hours": sum(week_hours.values()),
         "month_hours": month_hours,
         "total_month_hours": sum(month_hours.values()),
+        "course_hours": course_hours,
     }
 
 
-def course_stats(tasks, courses):
+def course_stats(tasks, courses, course_hours=None):
+    """Per-course totals. `hours` is tracked session time per course key
+    (pass `get_user_stats(...)["course_hours"]`); tasks themselves carry no
+    hours signal anymore — actual time lives on their study sessions."""
+    course_hours = course_hours or {}
     return {
         course["key"]: {
             "name": course["name"],
             "total": len([task for task in tasks if task.course_key == course["key"]]),
             "done": len([task for task in tasks if task.course_key == course["key"] and task.done]),
-            "hours": sum(task.hours for task in tasks if task.course_key == course["key"] and task.done),
+            "hours": round(course_hours.get(course["key"], 0.0), 2),
         }
         for course in courses
     }

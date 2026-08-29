@@ -216,34 +216,36 @@ sit at the data layer, not scattered across routes.** Tasks:
 - Graceful degradation: if Redis is down, fall through to the DB, never crash.
 - Tests: cache miss/hit, invalidation, TTL expiry, and Redis-down passthrough.
 
-### TASK-026 — REST API gaps for an SPA client
-The `/api/*` surface is usable today but missing endpoints a React/Next.js
-client needs. Add:
-- `GET /api/me` — current user profile (id, username, fullname, theme, is_admin).
-- `PUT /api/me` — update profile (fullname, theme; password change with current
-  password verification).
-- `GET /api/courses`, `GET /api/majors` — read-only list endpoints (admin needs
-  write variants: `POST/PUT/DELETE /api/courses`, `/api/majors` guarded by
-  `is_admin`).
-- `POST /api/auth/logout` — revoke the presented refresh token (single-session
-  logout; `revoke_user_refresh_tokens` is the logout-everywhere hammer).
-- Pagination on list endpoints beyond tasks (courses, sessions) where useful.
-- Tests for every new route, mirroring `TestAuthAPI` / `TestTasksAPI`.
+### TASK-026 — REST API gaps for an SPA client — DONE
+The `/api/*` surface is complete for the SPA (2026-08-30):
+- `GET /api/me` + `PUT /api/me` (fullname, theme; password change verifies
+  the current password and revokes all outstanding refresh tokens).
+- `POST /api/auth/logout` — revokes the presented refresh token, ownership-
+  verified (`RefreshTokenRepo.revoke_presented`); idempotent, garbage-safe.
+- `GET /api/courses`, `GET /api/majors` — language-neutral reads.
+- `POST/PUT/DELETE /api/courses` + `/api/majors` — admin-only via the new
+  `api_admin_required` guard; course delete preserves tasks (dashboard
+  parity); `computer_science` major protected; duplicate keys 409.
+- 28 route tests added. No pagination on courses/majors — reference data
+  is small (bundled seed); revisit if a tenant grows it.
 
-### TASK-027 — Stats correctness: StudySession as the hours signal
-Now that sessions are wired (TASK-016 DONE), move statistics from
-`Task.created_at` + `Task.hours` to `StudySession.started_at` +
-`StudySession.duration`. The current `sum(task.hours)` aggregation measures
-the wrong date and double-counts. Replace with SQL aggregation over
-`study_sessions` joined to the user's tasks:
-`COALESCE(SUM(study_sessions.duration), 0)` grouped by date. Update
-`services/statistics.py`, `routes/admin.py`, `/api/statistics/dashboard`, and
-the dashboard/admin templates to read from the new numbers. Keep a fallback
-to legacy `Task.hours` while backfilling, if needed, behind a config flag.
-Decide on backfill: existing rows have `duration` but no `started_at` session
-rows, so either keep legacy fallback for pre-cutover data or accept a one-time
-reset of historical hours. **Lands after TASK-025 so the new stats path is
-cached from day one; invalidate on session stop.**
+### TASK-027 — Stats correctness: StudySession as the hours signal — DONE
+Statistics now aggregate tracked `StudySession.duration` (seconds) grouped
+by the UTC day the session **started** — no longer `Task.hours` by
+`Task.created_at` (2026-08-30). Key decisions:
+- **Backfill chosen over reset** (deterministic, reversible): migration
+  `20260829_01` synthesizes one closed session per DONE task with no
+  sessions (`duration = hours*3600`, anchored 12:00 UTC on the task's
+  created_at day). Idempotent by construction; downgrade removes exactly
+  the synthesized rows and preserves real tracked sessions. Dialect-safe
+  (SQLAlchemy Core; SQLite's `CAST AS TIMESTAMP` is not a datetime cast).
+- Completed tasks with no sessions now show 0 hours (estimate is not
+  real study time). Session time counts on pending tasks too.
+- Open sessions (NULL duration) excluded; zero-duration counts as 0.
+- Per-course `hours` in `course_stats` come from the session totals via a
+  `course_hours` map (`get_user_stats()["course_hours"]`).
+- Migration tests in `tests/test_migrations.py` run on SQLite and (CI)
+  PostgreSQL.
 
 ### TASK-028 — Health/readiness endpoints — DONE
 Add `GET /healthz` (liveness, no DB check, always 200 if process is up) and

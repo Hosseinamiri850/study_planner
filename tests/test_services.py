@@ -1,6 +1,11 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
+
+
+def _dt(day, hour=12, minute=0):
+    """Naive timestamp on `day` (session columns are naive UTC)."""
+    return datetime(day.year, day.month, day.day, hour, minute)
 
 
 class TestGetUserStats:
@@ -16,36 +21,91 @@ class TestGetUserStats:
         assert "week_hours" in stats
         assert "month_hours" in stats
 
-    def test_user_stats_with_completed_tasks_today(self, app, create_user, create_task):
+    def test_stats_from_study_sessions_not_task_hours(self, app, create_user, create_task, create_study_session):
+        """The TASK-027 contract: hours come from tracked session durations
+        bucketed by started_at day — NOT from task.hours on created_at."""
         with app.test_request_context():
             user = create_user()
             today = date.today()
-            create_task(user=user, done=True, hours=2.0, created_at=today)
-            create_task(user=user, done=True, hours=1.5, created_at=today)
-            create_task(user=user, done=False, hours=3.0)
+            # Estimated hours 2.0/1.5 would show 3.5 under the old signal;
+            # tracked time is 1.0 + 0.5.
+            task1 = create_task(user=user, done=True, hours=2.0, created_at=today)
+            task2 = create_task(user=user, done=True, hours=1.5, created_at=today)
+            create_study_session(task=task1, duration=3600, started_at=_dt(today, 10), ended_at=_dt(today, 11))
+            create_study_session(task=task2, duration=1800, started_at=_dt(today, 12), ended_at=_dt(today, 12, 30))
             stats = get_user_stats(user)
-            assert stats["today_hours"] == 3.5
-            assert stats["total_week_hours"] == 3.5
+            assert stats["today_hours"] == 1.5
+            assert stats["total_week_hours"] == 1.5
 
-    def test_user_stats_pending_tasks_not_counted(self, create_user, create_task):
+    def test_estimated_hours_without_sessions_count_zero(self, create_user, create_task):
+        """A completed task with no tracked sessions contributes no hours —
+        estimate is not treated as real study time."""
         user = create_user()
-        create_task(user=user, done=False, hours=10.0)
+        create_task(user=user, done=True, hours=5.0)
         stats = get_user_stats(user)
         assert stats["today_hours"] == 0
-        assert stats["total_done"] == 0
-        assert stats["total_tasks"] == 1
+        assert stats["total_week_hours"] == 0
+        assert stats["total_done"] == 1  # task still counted as done
 
-    def test_user_stats_week_calculation(self, app, create_user, create_task):
+    def test_open_session_excluded(self, create_user, create_task, create_study_session):
+        """An open session (duration NULL) is not counted anywhere."""
+        user = create_user()
+        task = create_task(user=user, done=False, hours=2.0)
+        create_study_session(task=task, duration=None, started_at=_dt(date.today(), 9), ended_at=None)
+        stats = get_user_stats(user)
+        assert stats["today_hours"] == 0
+        assert stats["total_week_hours"] == 0
+
+    def test_zero_duration_session_counted_as_zero(self, create_user, create_task, create_study_session):
+        user = create_user()
+        task = create_task(user=user, done=True)
+        create_study_session(task=task, duration=0, started_at=_dt(date.today()), ended_at=_dt(date.today()))
+        stats = get_user_stats(user)
+        assert stats["today_hours"] == 0
+
+    def test_pending_task_sessions_still_counted(self, app, create_user, create_task, create_study_session):
+        """Studying happens on pending tasks too — session time counts
+        regardless of the task's done status."""
+        with app.test_request_context():
+            user = create_user()
+            task = create_task(user=user, done=False, hours=1.0)
+            create_study_session(task=task, duration=1800, started_at=_dt(date.today(), 10), ended_at=_dt(date.today(), 10, 30))
+            stats = get_user_stats(user)
+            assert stats["today_hours"] == 0.5
+            assert stats["total_week_hours"] == 0.5
+
+    def test_session_on_other_users_task_not_counted(self, create_user, create_task, create_study_session):
+        owner, other = create_user(), create_user()
+        task = create_task(user=owner, done=True)
+        create_study_session(task=task, duration=3600, started_at=_dt(date.today(), 10), ended_at=_dt(date.today(), 11))
+        stats = get_user_stats(other)
+        assert stats["today_hours"] == 0
+
+    def test_user_stats_week_calculation(self, app, create_user, create_task, create_study_session):
         with app.test_request_context():
             user = create_user()
             today = date.today()
             week_ago = today - timedelta(days=6)
             old_day = today - timedelta(days=10)
-            create_task(user=user, done=True, hours=1.0, created_at=week_ago)
-            create_task(user=user, done=True, hours=2.0, created_at=old_day)
+            task_week = create_task(user=user, done=True, created_at=week_ago)
+            task_old = create_task(user=user, done=True, created_at=old_day)
+            create_study_session(task=task_week, duration=3600, started_at=_dt(week_ago, 10), ended_at=_dt(week_ago, 11))
+            create_study_session(task=task_old, duration=7200, started_at=_dt(old_day, 10), ended_at=_dt(old_day, 12))
             stats = get_user_stats(user)
             assert stats["total_week_hours"] == 1.0
             assert stats["total_month_hours"] == 3.0
+
+    def test_sessions_bucketed_by_started_day_not_creation(self, app, create_user, create_task, create_study_session):
+        """A session that started yesterday shows on yesterday, even if the
+        task row was created today."""
+        with app.test_request_context():
+            user = create_user()
+            yesterday = date.today() - timedelta(days=1)
+            task = create_task(user=user, done=True, created_at=date.today())
+            create_study_session(task=task, duration=1800, started_at=_dt(yesterday, 22), ended_at=_dt(yesterday, 22, 30))
+            stats = get_user_stats(user)
+            assert stats["week_hours"][str(yesterday)] == 0.5
+            assert stats["today_hours"] == 0
 
 
 class TestAllCoursesList:
@@ -88,39 +148,46 @@ class TestCourseStats:
             assert stats["empty"]["done"] == 0
             assert stats["empty"]["hours"] == 0
 
-    def test_course_stats_calculations(self, app, create_user, create_course, create_task):
+    def test_course_stats_uses_tracked_time(self, app, create_user, create_course, create_task, create_study_session):
+        """Per-course hours come from tracked sessions via the course_hours
+        map — not summed task.hours estimates."""
         with app.test_request_context():
             user = create_user()
             course = create_course(key="py_stats", name_fa="پایتون", name_en="Python")
-            create_task(user=user, course=course, done=True, hours=5.0)
-            create_task(user=user, course=course, done=True, hours=3.0)
+            task1 = create_task(user=user, course=course, done=True, hours=5.0)
+            task2 = create_task(user=user, course=course, done=True, hours=3.0)
             create_task(user=user, course=course, done=False, hours=2.0)
+            create_study_session(task=task1, duration=3600, started_at=_dt(date.today(), 10), ended_at=_dt(date.today(), 11))
+            create_study_session(task=task2, duration=1800, started_at=_dt(date.today(), 12), ended_at=_dt(date.today(), 12, 30))
             tasks = user.tasks.all()
             courses = [{"key": "py_stats", "name": "پایتون"}]
-            stats = course_stats(tasks, courses)
-            assert stats["py_stats"]["total"] == 3
-            assert stats["py_stats"]["done"] == 2
-            assert stats["py_stats"]["hours"] == 8.0
+            stats = get_user_stats(user)
+            result = course_stats(tasks, courses, stats["course_hours"])
+            assert result["py_stats"]["total"] == 3
+            assert result["py_stats"]["done"] == 2
+            assert result["py_stats"]["hours"] == 1.5  # tracked, not 8.0 estimated
 
-    def test_course_stats_multiple_courses(self, app, create_user, create_course, create_task):
+    def test_course_stats_multiple_courses(self, app, create_user, create_course, create_task, create_study_session):
         with app.test_request_context():
             user = create_user()
             course1 = create_course(key="py_multi", name_fa="پایتون", name_en="Python")
             course2 = create_course(key="js_multi", name_fa="جاوا", name_en="Java")
-            create_task(user=user, course=course1, done=True, hours=5.0)
+            task1 = create_task(user=user, course=course1, done=True, hours=5.0)
             create_task(user=user, course=course2, done=False, hours=3.0)
+            create_study_session(task=task1, duration=3600, started_at=_dt(date.today(), 10), ended_at=_dt(date.today(), 11))
             tasks = user.tasks.all()
             courses = [
                 {"key": "py_multi", "name": "پایتون"},
                 {"key": "js_multi", "name": "جاوا"},
             ]
-            stats = course_stats(tasks, courses)
-            assert stats["py_multi"]["total"] == 1
-            assert stats["py_multi"]["done"] == 1
-            assert stats["py_multi"]["hours"] == 5.0
-            assert stats["js_multi"]["total"] == 1
-            assert stats["js_multi"]["done"] == 0
-            assert stats["js_multi"]["hours"] == 0
+            stats = get_user_stats(user)
+            result = course_stats(tasks, courses, stats["course_hours"])
+            assert result["py_multi"]["total"] == 1
+            assert result["py_multi"]["done"] == 1
+            assert result["py_multi"]["hours"] == 1.0
+            assert result["js_multi"]["total"] == 1
+            assert result["js_multi"]["done"] == 0
+            assert result["js_multi"]["hours"] == 0
 
 
 class TestMajorsForTemplate:
