@@ -479,7 +479,7 @@ def dashboard_statistics():
         "total_week_hours": stats["total_week_hours"],
         "month_hours": stats["month_hours"],
         "total_month_hours": stats["total_month_hours"],
-        "courses": course_stats(stats["tasks"], courses),
+        "courses": course_stats(stats["tasks"], courses, stats["course_hours"]),
     })
 
 
