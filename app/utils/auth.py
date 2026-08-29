@@ -46,6 +46,16 @@ def issue_refresh_token(user):
     return _refresh_serializer().dumps({"user_id": user.id, "jti": jti})
 
 
+def verify_refresh_token(signed_token):
+    """Decode a signed refresh token, or return None when invalid/expired.
+
+    Signature/TTL check only — no DB lookup (callers check jti state)."""
+    try:
+        return _refresh_serializer().loads(signed_token, max_age=REFRESH_TTL_DAYS * 24 * 60 * 60)
+    except (BadSignature, SignatureExpired):
+        return None
+
+
 def rotate_refresh_token(signed_token):
     """Verify a refresh token, revoke it (rotation), and issue a new pair.
 
@@ -53,9 +63,8 @@ def rotate_refresh_token(signed_token):
     (None, None, None) on any failure (expired, revoked, bad signature, or
     stale DB row) — the caller surfaces a 401.
     """
-    try:
-        payload = _refresh_serializer().loads(signed_token, max_age=REFRESH_TTL_DAYS * 24 * 60 * 60)
-    except (BadSignature, SignatureExpired):
+    payload = verify_refresh_token(signed_token)
+    if not payload:
         return None, None, None
     user_id = payload.get("user_id")
     jti = payload.get("jti")
@@ -73,20 +82,45 @@ def rotate_refresh_token(signed_token):
     return user, create_access_token(user), new_refresh
 
 
+def _authenticate_api():
+    """Resolve the Bearer token to a user, or return an error response.
+
+    Returns (user, None) on success — the user is also stashed on `g.api_user`
+    — or (None, (body, status)) on any failure.
+    """
+    token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
+    if not token:
+        return None, ({"error": "Bearer authentication is required."}, 401)
+    try:
+        payload = _access_serializer().loads(token, max_age=ACCESS_TOKEN_TTL_SECONDS)
+    except (BadSignature, SignatureExpired):
+        return None, ({"error": "Invalid or expired access token."}, 401)
+    user = db.session.get(User, payload.get("user_id"))
+    if not user:
+        return None, ({"error": "User not found."}, 401)
+    g.api_user = user
+    return user, None
+
+
 def api_auth_required(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        token = request.headers.get("Authorization", "").removeprefix("Bearer ").strip()
-        if not token:
-            return {"error": "Bearer authentication is required."}, 401
-        try:
-            payload = _access_serializer().loads(token, max_age=ACCESS_TOKEN_TTL_SECONDS)
-        except (BadSignature, SignatureExpired):
-            return {"error": "Invalid or expired access token."}, 401
-        user = db.session.get(User, payload.get("user_id"))
-        if not user:
-            return {"error": "User not found."}, 401
-        g.api_user = user
+        user, error = _authenticate_api()
+        if error is not None:
+            return error
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def api_admin_required(view):
+    """Bearer auth + administrator role for write-guarded API endpoints."""
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user, error = _authenticate_api()
+        if error is not None:
+            return error
+        if not user.is_admin:
+            return {"error": "Administrator privileges required."}, 403
         return view(*args, **kwargs)
     return wrapped
 

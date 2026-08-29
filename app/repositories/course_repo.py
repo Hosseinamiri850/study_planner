@@ -53,6 +53,11 @@ class CourseRepo(Repo):
         )
 
     @classmethod
+    def get_for_write(cls, course_id):
+        """Load via the write session — required before mutating + committing."""
+        return cls._write().get(Course, course_id)
+
+    @classmethod
     def list_for_major(cls, major_id):
         return (
             cls._read()
@@ -70,6 +75,12 @@ class CourseRepo(Repo):
         cls._write().commit()
         _invalidate_course_caches()
         return course
+
+    @classmethod
+    def commit(cls):
+        """Commit the pending unit of work and invalidate the read caches."""
+        cls._write().commit()
+        _invalidate_course_caches()
 
     @classmethod
     def add_flush(cls, course):

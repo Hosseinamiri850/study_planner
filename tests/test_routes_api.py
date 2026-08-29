@@ -322,3 +322,201 @@ class TestRefreshTokens:
         revoke_user_refresh_tokens(user.id)
         db.session.commit()
         assert client.post("/api/auth/refresh", json={"refresh_token": refresh}).status_code == 401
+
+
+class TestMeAPI:
+    def test_me_requires_auth(self, client):
+        assert client.get("/api/me").status_code == 401
+
+    def test_me_returns_profile(self, auth_client):
+        client, user = auth_client
+        response = client.get("/api/me")
+        assert response.status_code == 200
+        data = response.get_json()["user"]
+        assert data["id"] == user.id
+        assert data["username"] == user.username
+        assert data["fullname"] == user.fullname
+        assert data["is_admin"] is False
+        assert data["theme"] in {"dark", "light"}
+
+    def test_me_rejects_garbage_token(self, client):
+        client.environ_base["HTTP_AUTHORIZATION"] = "Bearer garbage"
+        assert client.get("/api/me").status_code == 401
+
+    def test_update_me_fullname_and_theme(self, auth_client):
+        client, user = auth_client
+        response = client.put("/api/me", json={"fullname": "Renamed User", "theme": "light"})
+        assert response.status_code == 200
+        data = response.get_json()["user"]
+        assert data["fullname"] == "Renamed User"
+        assert data["theme"] == "light"
+        assert user.fullname == "Renamed User"
+
+    def test_update_me_rejects_bad_theme(self, auth_client):
+        client, _ = auth_client
+        assert client.put("/api/me", json={"theme": "purple"}).status_code == 400
+
+    def test_update_me_rejects_empty_fullname(self, auth_client):
+        client, _ = auth_client
+        assert client.put("/api/me", json={"fullname": "   "}).status_code == 400
+
+    def test_update_me_password_change(self, auth_client):
+        client, user = auth_client
+        response = client.put("/api/me", json={"current_password": "testpass123", "password": "brandnewpass1"})
+        assert response.status_code == 200
+        from werkzeug.security import check_password_hash
+        assert check_password_hash(user.password, "brandnewpass1")
+
+    def test_update_me_password_wrong_current(self, auth_client):
+        client, _ = auth_client
+        response = client.put("/api/me", json={"current_password": "wrongpass", "password": "brandnewpass1"})
+        assert response.status_code == 403
+
+    def test_update_me_password_too_short(self, auth_client):
+        client, _ = auth_client
+        assert client.put("/api/me", json={"current_password": "testpass123", "password": "short"}).status_code == 400
+
+    def test_update_me_password_revokes_refresh(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access}"
+        assert client.put("/api/me", json={"current_password": "testpass123", "password": "brandnewpass1"}).status_code == 200
+        client.environ_base.pop("HTTP_AUTHORIZATION", None)
+        # Old refresh token no longer mints access tokens.
+        assert client.post("/api/auth/refresh", json={"refresh_token": refresh}).status_code == 401
+
+
+class TestLogoutAPI:
+    def test_logout_requires_auth(self, client):
+        assert client.post("/api/auth/logout", json={}).status_code == 401
+
+    def test_logout_revokes_refresh(self, client, login_tokens):
+        user, access, refresh = login_tokens
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access}"
+        assert client.post("/api/auth/logout", json={"refresh_token": refresh}).status_code == 204
+        client.environ_base.pop("HTTP_AUTHORIZATION", None)
+        # Revoked refresh token cannot mint new access tokens.
+        assert client.post("/api/auth/refresh", json={"refresh_token": refresh}).status_code == 401
+
+    def test_logout_without_refresh_token_still_204(self, client, login_tokens):
+        user, access, _ = login_tokens
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access}"
+        assert client.post("/api/auth/logout", json={}).status_code == 204
+
+    def test_logout_garbage_token_safe(self, client, login_tokens):
+        user, access, _ = login_tokens
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access}"
+        assert client.post("/api/auth/logout", json={"refresh_token": "garbage"}).status_code == 204
+
+    def test_logout_other_users_token_ignored(self, client, create_user, login_tokens):
+        """A user cannot revoke someone else's refresh token via logout."""
+        other = create_user(username="otheruser")
+        from app.utils.auth import issue_refresh_token
+        other_token = issue_refresh_token(other)
+        user, access, _ = login_tokens
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {access}"
+        assert client.post("/api/auth/logout", json={"refresh_token": other_token}).status_code == 204
+        client.environ_base.pop("HTTP_AUTHORIZATION", None)
+        # Other user's token still valid.
+        assert client.post("/api/auth/refresh", json={"refresh_token": other_token}).status_code == 200
+
+
+def _login_admin(client):
+    """Create + promote + log in an admin; return the bearer token."""
+    created = client.post(
+        "/api/auth/register",
+        json={"username": "adminuser", "password": "testpass123", "fullname": "Admin"},
+    ).get_json()
+    from app.extensions import db
+    from app.models import User
+    user = db.session.get(User, created["user"]["id"])
+    user.is_admin = True
+    db.session.commit()
+    login = client.post("/api/auth/login", json={"username": "adminuser", "password": "testpass123"})
+    return login.get_json()["access_token"]
+
+
+class TestCoursesMajorsAPI:
+    def test_courses_requires_auth(self, client):
+        assert client.get("/api/courses").status_code == 401
+
+    def test_majors_requires_auth(self, client):
+        assert client.get("/api/majors").status_code == 401
+
+    def test_list_courses(self, auth_client, create_course):
+        course = create_course()
+        client = auth_client[0]
+        response = client.get("/api/courses")
+        assert response.status_code == 200
+        courses = response.get_json()["courses"]
+        assert any(c["id"] == course.id and c["key"] == course.key for c in courses)
+        assert all("name_fa" in c and "name_en" in c for c in courses)
+
+    def test_list_majors_nested_courses(self, auth_client, create_course):
+        course = create_course()
+        client = auth_client[0]
+        response = client.get("/api/majors")
+        assert response.status_code == 200
+        majors = response.get_json()["majors"]
+        target = next(m for m in majors if m["id"] == course.major.id)
+        assert any(c["id"] == course.id for c in target["courses"])
+
+    def test_create_course_admin_only(self, auth_client, create_major):
+        client, _ = auth_client
+        major = create_major()
+        response = client.post("/api/courses", json={"name_fa": "dars", "name_en": "Lesson", "major_id": major.id})
+        assert response.status_code == 403
+
+    def test_create_course_admin_success(self, client, create_major):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        major = create_major()
+        response = client.post("/api/courses", json={"name_fa": "dars", "name_en": "Lesson", "major_id": major.id})
+        assert response.status_code == 201
+        assert response.get_json()["course"]["key"] == "lesson"
+
+    def test_create_course_duplicate_key_409(self, client, create_major):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        major = create_major()
+        client.post("/api/courses", json={"name_fa": "dars", "name_en": "Lesson", "major_id": major.id})
+        dup = client.post("/api/courses", json={"name_fa": "dars2", "name_en": "Lesson", "major_id": major.id})
+        assert dup.status_code == 409
+
+    def test_create_course_missing_fields(self, client, create_major):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        major = create_major()
+        assert client.post("/api/courses", json={"name_en": "Only English", "major_id": major.id}).status_code == 400
+        assert client.post("/api/courses", json={"name_fa": "farsi", "name_en": "No Major"}).status_code == 400
+
+    def test_update_course(self, client, create_course):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        course = create_course()
+        response = client.put(f"/api/courses/{course.id}", json={"name_en": "Renamed"})
+        assert response.status_code == 200
+        assert response.get_json()["course"]["name_en"] == "Renamed"
+
+    def test_update_course_not_found(self, client):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        assert client.put("/api/courses/99999", json={"name_en": "X"}).status_code == 404
+
+    def test_delete_course_preserves_tasks(self, client, create_course, create_task):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        course = create_course()
+        task = create_task(course=course)
+        assert client.delete(f"/api/courses/{course.id}").status_code == 204
+        from app.repositories import TaskRepo
+        assert TaskRepo.get(task.id) is not None  # task row survives
+        assert TaskRepo.get(task.id).course_id is None  # FK nulled
+
+    def test_create_major_admin_success_and_duplicate(self, client):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        first = client.post("/api/majors", json={"name_fa": "reshte", "name_en": "Field"})
+        assert first.status_code == 201
+        dup = client.post("/api/majors", json={"name_fa": "reshte", "name_en": "Field"})
+        assert dup.status_code == 409
+
+    def test_delete_major_protects_default(self, client, create_major):
+        client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {_login_admin(client)}"
+        protected = create_major(key="computer_science")
+        normal = create_major()
+        assert client.delete(f"/api/majors/{protected.id}").status_code == 409
+        assert client.delete(f"/api/majors/{normal.id}").status_code == 204
+        assert client.delete(f"/api/majors/{normal.id}").status_code == 404

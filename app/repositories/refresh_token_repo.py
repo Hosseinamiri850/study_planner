@@ -34,6 +34,29 @@ class RefreshTokenRepo(Repo):
         token.revoke()
 
     @classmethod
+    def revoke_presented(cls, user_id, signed_token):
+        """Revoke the presented refresh token if it belongs to `user_id`.
+
+        Safely ignores garbage/unknown/expired tokens (logout must never
+        500 on a malformed client payload). Verifies ownership so a token
+        from another account cannot be revoked by this user.
+        """
+        from app.utils.auth import verify_refresh_token
+
+        payload = verify_refresh_token(signed_token)
+        if payload is None:
+            return False
+        jti = payload.get("jti")
+        if not jti or payload.get("user_id") != user_id:
+            return False
+        row = cls.find_by_jti(jti)
+        if row is None or row.revoked or row.is_expired:
+            return False
+        row.revoke()
+        cls._write().commit()
+        return True
+
+    @classmethod
     def revoke_all_for_user(cls, user_id):
         """Invalidate every outstanding refresh token for a user (password
         change, logout-all). Used by the admin password-change flow."""
