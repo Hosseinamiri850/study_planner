@@ -129,6 +129,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Sync locale files (gitignored; needed before typecheck)
+        run: node scripts/sync-locales.mjs
+
       - name: Typecheck
         run: npm run typecheck
 
