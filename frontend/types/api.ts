@@ -34,6 +34,9 @@ export interface Task {
   estimated_hours: number;
   created_at: string;
   completed_at: string | null;
+  /** Id of the currently-open study session, when one is running (added
+   * in release QA so the SPA can restore the timer after a reload). */
+  open_session_id: number | null;
 }
 
 export interface TaskListResponse {

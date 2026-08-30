@@ -520,3 +520,65 @@ class TestCoursesMajorsAPI:
         assert client.delete(f"/api/majors/{protected.id}").status_code == 409
         assert client.delete(f"/api/majors/{normal.id}").status_code == 204
         assert client.delete(f"/api/majors/{normal.id}").status_code == 404
+
+
+class TestTaskOpenSessionPayload:
+    def test_list_tasks_includes_open_session_id(self, auth_client, create_task, create_study_session):
+        """Release-QA regression: the SPA needs the open-session id in the
+        task payload to restore the running timer after a page reload."""
+        client, user = auth_client
+        task = create_task(user=user)
+        session = create_study_session(task=task, duration=None, started_at=None, ended_at=None)
+        data = client.get("/api/tasks").get_json()
+        row = next(t for t in data["tasks"] if t["id"] == task.id)
+        assert row["open_session_id"] == session.id
+
+    def test_list_tasks_open_session_id_null_when_closed(self, auth_client, create_task, create_study_session):
+        client, user = auth_client
+        task = create_task(user=user)
+        closed = create_study_session(task=task, duration=60, started_at=None, ended_at=None)
+        closed.ended_at = closed.started_at  # close it
+        from app.extensions import db as _db
+        _db.session.commit()
+        data = client.get("/api/tasks").get_json()
+        row = next(t for t in data["tasks"] if t["id"] == task.id)
+        assert row["open_session_id"] is None
+
+    def test_open_session_id_scoped_to_owner(self, auth_client, create_user, create_task, create_study_session):
+        """Another user's open session must not leak into this user's payload."""
+        client, _ = auth_client
+        other = create_user(username="other_sess_user")
+        other_task = create_task(user=other)
+        create_study_session(task=other_task, duration=None, started_at=None, ended_at=None)
+        data = client.get("/api/tasks").get_json()
+        assert all(t["open_session_id"] is None for t in data["tasks"])
+
+
+class TestTaskInputLimits:
+    def test_create_task_title_over_255_rejected(self, auth_client, create_course):
+        """Release-QA regression: an over-long title used to hit the DB
+        column limit and surface as an unhandled 500 instead of a 400."""
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "x" * 256, "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 400
+        assert "title" in response.get_json()["error"]
+
+    def test_update_task_title_over_255_rejected(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        response = client.put(f"/api/tasks/{task.id}", json={"title": "x" * 256})
+        assert response.status_code == 400
+
+    def test_create_task_unicode_title_ok(self, auth_client, create_course):
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "فارسی ✨ 中文", "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 201
+        assert response.get_json()["task"]["title"] == "فارسی ✨ 中文"
+
+    def test_create_task_title_at_limit_ok(self, auth_client, create_course):
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "x" * 255, "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 201

@@ -54,7 +54,7 @@ export default function DashboardPage() {
   }, [api]);
 
   const loadTasks = useCallback(
-    async (targetPage: number) => {
+    async (targetPage: number, opts?: { restoreRunning?: boolean }) => {
       setTasksError(null);
       try {
         const data = (await api.listTasks(targetPage, PER_PAGE)) as TaskListPaginatedResponse;
@@ -64,23 +64,48 @@ export default function DashboardPage() {
         setPage(data.page);
         // Re-sync the running-session indicator with the server: find the
         // open session among the page's tasks (server is authoritative).
-        const openTask = data.tasks.find((task) => task.id === runningTaskId);
-        if (!openTask) {
+        const open = data.tasks.find((task) => task.open_session_id != null);
+        if (open) {
+          setRunningTaskId(open.id);
+          setRunningSessionId(open.open_session_id);
+          if (opts?.restoreRunning && runningSince === null) {
+            // Page reload mid-session: re-anchor the display timer from the
+            // user's local clock offset against the session's start. The
+            // backend stores naive UTC; compute elapsed from the session
+            // row itself so the timer survives reloads.
+            try {
+              const { sessions } = await api.listSessions(open.id);
+              const session = sessions.find((s) => s.id === open.open_session_id);
+              if (session?.started_at) {
+                const startedUtcMs = Date.parse(session.started_at.endsWith("Z") ? session.started_at : `${session.started_at}Z`);
+                if (!Number.isNaN(startedUtcMs)) setRunningSince(startedUtcMs);
+                else setRunningSince(Date.now());
+              } else {
+                setRunningSince(Date.now());
+              }
+            } catch {
+              setRunningSince(Date.now());
+            }
+            setElapsed(0);
+          }
+        } else {
           setRunningTaskId(null);
           setRunningSessionId(null);
+          setRunningSince(null);
         }
       } catch (err) {
         setTasksError(errorMessage(err));
       }
     },
-    // runningTaskId intentionally omitted: only used to clear state
+    // runningTaskId/runningSince intentionally omitted: only used to
+    // decide whether to restore, not to refetch
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [api],
   );
 
   useEffect(() => {
     void loadStats();
-    void loadTasks(1);
+    void loadTasks(1, { restoreRunning: true });
     api
       .listCourses()
       .then((data) => setCourses(data.courses))
@@ -326,7 +351,7 @@ export default function DashboardPage() {
           </ul>
         )}
         {tasks && pages > 1 && (
-          <nav className="flex items-center justify-center gap-3" aria-label="Pagination">
+          <nav className="flex items-center justify-center gap-3" aria-label={t("a11y.pagination")}>
             <Button variant="secondary" className="px-3 py-1 text-xs" disabled={page <= 1} onClick={() => void loadTasks(page - 1)}>
               {t("tasks.prev_page")}
             </Button>
