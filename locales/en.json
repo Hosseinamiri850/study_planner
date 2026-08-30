@@ -175,5 +175,11 @@
     "load_failed": "Could not load data.",
     "forbidden": "You do not have permission for this action.",
     "not_found": "Not found."
+  },
+  "a11y": {
+    "main_nav": "Main",
+    "mobile_nav": "Mobile",
+    "menu": "Menu",
+    "pagination": "Pagination"
   }
 }

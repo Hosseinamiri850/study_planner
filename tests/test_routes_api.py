@@ -552,3 +552,33 @@ class TestTaskOpenSessionPayload:
         create_study_session(task=other_task, duration=None, started_at=None, ended_at=None)
         data = client.get("/api/tasks").get_json()
         assert all(t["open_session_id"] is None for t in data["tasks"])
+
+
+class TestTaskInputLimits:
+    def test_create_task_title_over_255_rejected(self, auth_client, create_course):
+        """Release-QA regression: an over-long title used to hit the DB
+        column limit and surface as an unhandled 500 instead of a 400."""
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "x" * 256, "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 400
+        assert "title" in response.get_json()["error"]
+
+    def test_update_task_title_over_255_rejected(self, auth_client, create_task):
+        client, user = auth_client
+        task = create_task(user=user)
+        response = client.put(f"/api/tasks/{task.id}", json={"title": "x" * 256})
+        assert response.status_code == 400
+
+    def test_create_task_unicode_title_ok(self, auth_client, create_course):
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "فارسی ✨ 中文", "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 201
+        assert response.get_json()["task"]["title"] == "فارسی ✨ 中文"
+
+    def test_create_task_title_at_limit_ok(self, auth_client, create_course):
+        client, _ = auth_client
+        course = create_course()
+        response = client.post("/api/tasks", json={"course_key": course.key, "title": "x" * 255, "priority": "low", "estimated_hours": 1})
+        assert response.status_code == 201

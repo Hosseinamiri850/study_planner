@@ -355,6 +355,10 @@ def list_tasks():
     return jsonify({"tasks": [_task_payload(task, open_ids) for task in tasks]})
 
 
+TASK_TITLE_MAX = 255  # tasks.title column limit; guard before the DB does
+TASK_DESCRIPTION_MAX = 10_000
+
+
 @api_bp.route("/tasks", methods=["POST"])
 @csrf.exempt
 @api_auth_required
@@ -363,16 +367,22 @@ def create_task():
     course = _resolve_course(data)
     hours = positive_hours(data.get("estimated_hours", 0))
     priority = data.get("priority", "medium")
+    title = str(data.get("title", "")).strip()
+    description = str(data.get("description", "")).strip()
     if not course:
         return _error("A valid course_id or course_key is required.")
     if hours is None or not valid_priority(priority):
         return _error("estimated_hours must be between 0 and 24 and priority must be low, medium, or high.")
+    if len(title) > TASK_TITLE_MAX:
+        return _error(f"title must be at most {TASK_TITLE_MAX} characters.")
+    if len(description) > TASK_DESCRIPTION_MAX:
+        return _error(f"description must be at most {TASK_DESCRIPTION_MAX} characters.")
     task = TaskRepo.create(
         user_id=g.api_user.id,
         course_id=course.id,
         course_key=course.key,
-        title=str(data.get("title", "")).strip() or course.display_name(),
-        description=str(data.get("description", "")).strip(),
+        title=title or course.display_name(),
+        description=description,
         priority=priority,
         hours=hours,
     )
@@ -394,9 +404,15 @@ def update_task(task_id):
     if course:
         TaskRepo.update_course_link(task, course)
     if "title" in data:
-        fields["title"] = str(data["title"]).strip() or course.display_name()
+        title = str(data["title"]).strip()
+        if len(title) > TASK_TITLE_MAX:
+            return _error(f"title must be at most {TASK_TITLE_MAX} characters.")
+        fields["title"] = title or course.display_name()
     if "description" in data:
-        fields["description"] = str(data["description"]).strip()
+        description = str(data["description"]).strip()
+        if len(description) > TASK_DESCRIPTION_MAX:
+            return _error(f"description must be at most {TASK_DESCRIPTION_MAX} characters.")
+        fields["description"] = description
     if "priority" in data:
         if not valid_priority(data["priority"]):
             return _error("Invalid priority.")

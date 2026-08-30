@@ -351,7 +351,7 @@ export default function DashboardPage() {
           </ul>
         )}
         {tasks && pages > 1 && (
-          <nav className="flex items-center justify-center gap-3" aria-label="Pagination">
+          <nav className="flex items-center justify-center gap-3" aria-label={t("a11y.pagination")}>
             <Button variant="secondary" className="px-3 py-1 text-xs" disabled={page <= 1} onClick={() => void loadTasks(page - 1)}>
               {t("tasks.prev_page")}
             </Button>
