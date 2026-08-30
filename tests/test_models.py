@@ -5,8 +5,18 @@ from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
 from app.models import Course, Major
+from app.models.task import _utcnow
 from app.services.seed import seed_reference_data
 from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
+
+
+class TestUtcNow:
+    def test_returns_naive_utc(self):
+        """Regression (2026-08-30): an AWARE utcnow sent through psycopg is
+        stored by PostgreSQL as server-local wall clock in naive columns,
+        corrupting durations on non-UTC hosts. The value must be naive."""
+        now = _utcnow()
+        assert now.tzinfo is None
 
 
 class TestUserModel:

@@ -11,7 +11,9 @@ from app.extensions import db
 
 
 def _utcnow():
-    return datetime.now(UTC)
+    """Naive UTC (see app/models/task.py:_utcnow for why naive matters
+    under psycopg + TIMESTAMP WITHOUT TIME ZONE columns)."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 REFRESH_TTL_DAYS = 30
