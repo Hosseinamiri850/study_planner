@@ -4,10 +4,14 @@ from app.extensions import db
 
 
 def _utcnow():
-    """Timezone-aware UTC timestamp, for use as a SQLAlchemy column default
-    or a manual assignment. Stored as a naive UTC value because none of the
-    DateTime columns carry tz info; the intent (UTC) is preserved here."""
-    return datetime.now(UTC)
+    """Naive UTC timestamp for the DateTime columns (all naive). Must be
+    NAIVE, not tz-aware: psycopg sends an aware value as timestamptz and
+    PostgreSQL then converts it to the server's local zone when storing
+    into a TIMESTAMP WITHOUT TIME ZONE column, which corrupts the wall
+    clock on any non-UTC host (surfaced as negative study-session
+    durations via the frontend, 2026-08-30). datetime.utcnow() yields the
+    naive UTC wall clock that both SQLite and PostgreSQL store verbatim."""
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Task(db.Model):
