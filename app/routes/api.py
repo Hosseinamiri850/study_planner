@@ -5,6 +5,7 @@ from app.config import Config
 from app.extensions import csrf, limiter
 from app.integrations.translator import auto_translate
 from app.integrations.translator import is_available as translator_available
+from app.models import StudySession
 from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
 from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
@@ -25,7 +26,10 @@ def _error(message, status=400):
     return jsonify({"error": message}), status
 
 
-def _task_payload(task):
+def _task_payload(task, open_session_ids=None):
+    """open_session_ids: optional set of task ids having an open session,
+    precomputed for a whole page of tasks (avoids a query per task)."""
+    open_id = open_session_ids.get(task.id) if open_session_ids else task.study_sessions.filter(StudySession.ended_at.is_(None)).scalar()
     return {
         "id": task.id,
         "course_id": task.course_id,
@@ -37,7 +41,21 @@ def _task_payload(task):
         "estimated_hours": task.estimated_hours,
         "created_at": task.created_at.isoformat(),
         "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+        # Additive (release QA): lets the SPA restore the running-timer UI
+        # after a page reload — previously a reload mid-session left the
+        # row showing "Start", and clicking it 409'd. Only the id; the
+        # started_at comes from the sessions list endpoint.
+        "open_session_id": open_id,
     }
+
+
+def _open_session_ids_for(tasks):
+    """Map task_id -> open session id for the given tasks, one query."""
+    ids = [task.id for task in tasks]
+    if not ids:
+        return {}
+    rows = StudySession.query.filter(StudySession.task_id.in_(ids), StudySession.ended_at.is_(None)).all()
+    return {row.task_id: row.id for row in rows}
 
 
 def _resolve_course(data, existing=None):
@@ -330,9 +348,11 @@ def list_tasks():
         # Flask-SQLAlchemy paginate() emits LIMIT/OFFSET at the SQL layer,
         # so we never materialise the whole rowset into memory.
         pagination = TaskRepo.list_for_user(g.api_user.id, page=page, per_page=per_page)
-        return jsonify({"tasks": [_task_payload(task) for task in pagination.items], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
+        open_ids = _open_session_ids_for(pagination.items)
+        return jsonify({"tasks": [_task_payload(task, open_ids) for task in pagination.items], "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total, "pages": pagination.pages})
     tasks = TaskRepo.list_for_user(g.api_user.id)
-    return jsonify({"tasks": [_task_payload(task) for task in tasks]})
+    open_ids = _open_session_ids_for(tasks)
+    return jsonify({"tasks": [_task_payload(task, open_ids) for task in tasks]})
 
 
 @api_bp.route("/tasks", methods=["POST"])

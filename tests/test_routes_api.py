@@ -520,3 +520,35 @@ class TestCoursesMajorsAPI:
         assert client.delete(f"/api/majors/{protected.id}").status_code == 409
         assert client.delete(f"/api/majors/{normal.id}").status_code == 204
         assert client.delete(f"/api/majors/{normal.id}").status_code == 404
+
+
+class TestTaskOpenSessionPayload:
+    def test_list_tasks_includes_open_session_id(self, auth_client, create_task, create_study_session):
+        """Release-QA regression: the SPA needs the open-session id in the
+        task payload to restore the running timer after a page reload."""
+        client, user = auth_client
+        task = create_task(user=user)
+        session = create_study_session(task=task, duration=None, started_at=None, ended_at=None)
+        data = client.get("/api/tasks").get_json()
+        row = next(t for t in data["tasks"] if t["id"] == task.id)
+        assert row["open_session_id"] == session.id
+
+    def test_list_tasks_open_session_id_null_when_closed(self, auth_client, create_task, create_study_session):
+        client, user = auth_client
+        task = create_task(user=user)
+        closed = create_study_session(task=task, duration=60, started_at=None, ended_at=None)
+        closed.ended_at = closed.started_at  # close it
+        from app.extensions import db as _db
+        _db.session.commit()
+        data = client.get("/api/tasks").get_json()
+        row = next(t for t in data["tasks"] if t["id"] == task.id)
+        assert row["open_session_id"] is None
+
+    def test_open_session_id_scoped_to_owner(self, auth_client, create_user, create_task, create_study_session):
+        """Another user's open session must not leak into this user's payload."""
+        client, _ = auth_client
+        other = create_user(username="other_sess_user")
+        other_task = create_task(user=other)
+        create_study_session(task=other_task, duration=None, started_at=None, ended_at=None)
+        data = client.get("/api/tasks").get_json()
+        assert all(t["open_session_id"] is None for t in data["tasks"])
