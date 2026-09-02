@@ -19,6 +19,3 @@ instance/
 # Graphify generated knowledge-graph output (regenerable via graphify extract)
 graphify-out/
 .graphifyignore
-
-# Local screenshot captures (not referenced by README)
-docs/screenshots/

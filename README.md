@@ -1,457 +1,170 @@
-> **Architecture update (P0):** the application now uses an application factory,
-> blueprints, isolated models/services, and Alembic migrations. Tables are no
-> longer created when the server starts.
+# Study Planner
 
-## Development and database migrations
+A bilingual (Persian/English) study planner for students: track courses, manage tasks, time your study sessions, and watch your hours accumulate across daily, weekly, and monthly views. Flask + PostgreSQL on the backend, a Next.js single-page frontend in front of it, both wrapped in full RTL/LTR i18n and dark/light theming.
 
-Copy `.env.example` to `.env` and provide your own `SECRET_KEY` and
-`DATABASE_URL`. `SECRET_KEY` is required; the application will refuse to start
-without it. The `.env` file is loaded for local development and must never be
-committed.
+| Dashboard (fa) | Login | Mobile |
+| --- | --- | --- |
+| ![Dashboard](docs/screenshots/dashboard-user-desktop.png) | ![Login](docs/screenshots/login-desktop.png) | ![Mobile](docs/screenshots/login-mobile.png) |
 
-Run migrations before starting the server:
+## Features
 
-```bash
-flask --app app db upgrade
-flask --app app seed-reference-data  # optional: bundled majors and courses
-python app.py
-```
+- **Task management per course** — create, edit, complete, and delete study tasks with priority levels (high / medium / low) and estimated hours.
+- **Study sessions with a live timer** — start a session on any task; the timer survives page reloads (the running session is part of the task payload).
+- **Statistics from real session data** — today/week/month study hours aggregated from `StudySession` records, plus per-course progress and interactive weekly/monthly charts.
+- **Social view** — see other users' task counts and study hours for friendly comparison.
+- **Admin panel** — manage majors and courses (the course catalog), with separate admin detection and API-side authorization.
+- **Profile management** — update your display name and theme, change your password (which revokes all refresh tokens).
+- **Full Persian ↔ English i18n** — RTL/LTR layout switching, language persisted per user, auto-translation of new major/course names via LibreTranslate (optional).
+- **Dark/light theme** — saved per user in the database; guests get a localStorage fallback.
 
-For a database created by the pre-migration version of the application, take a
-backup first, then record the matching baseline before upgrading:
-
-```bash
-flask --app app db stamp 20260723_01
-flask --app app db upgrade
-```
-
-The second revision adds `Task.status`, `Task.estimated_hours`, an optional
-`Task.course_id`, completion metadata, and the `StudySession` table. Legacy
-`course_key`, `hours`, and `done` columns are retained for compatibility while
-the application transitions to the normalized model.
-
-`seed-reference-data` deliberately creates **no administrator account**. Create
-users through registration, then assign administrative access using an audited
-deployment/admin process. Existing databases should be backed up and stamped or
-migrated according to their current Alembic state before deployment.
+## Architecture
 
 ```text
-app/
-  models/       SQLAlchemy entities
-  routes/       web, admin, and API blueprints
-  services/     statistics and explicit seed operations
-  utils/        authentication and i18n helpers
-  extensions.py Flask extension instances
-  config.py     environment-backed configuration
+┌────────────────────────┐         ┌─────────────────────────────┐
+│  Next.js 15 (App      │  same-  │  Flask 3 API + app factory  │
+│  Router, TypeScript,  │─ origin │  ├─ routes/    web · admin  │
+│  Tailwind CSS v4)     │  proxy  │  │              api (JSON)   │
+│  frontend/            │────────▶│  ├─ repositories/ (read/    │
+│  - typed API client   │  fetch  │  │                 write seam)│
+│  - httpOnly refresh   │         │  ├─ services/  statistics,  │
+│    cookie (sp_refresh)│         │  │                 seed      │
+│  - fa/en RTL UI       │         │  ├─ models/    SQLAlchemy   │
+└────────────────────────┘         │  └─ migrations/ Alembic     │
+                                   └──────────┬──────────────────┘
+                                              │
+                                   PostgreSQL 16 + Redis 7
 ```
 
-## REST API
+- **Backend** (`app/`): Flask application factory with `web` (server-rendered browser routes, session + CSRF), `admin` (admin browser routes), and `api` blueprints (JSON REST, bearer-token auth). Data access is centralized in the **repository layer** (`app/repositories/`) behind a read/write session seam so a read replica can be enabled via config without touching route code.
+- **Frontend** (`frontend/`): Next.js 15 App Router + TypeScript + Tailwind CSS. The browser never talks to Flask directly: Next route handlers under `app/api/**` proxy to Flask, attach/detach the httpOnly refresh-token cookie, and hand the short-lived access token to the client in memory only. This means **no CORS is needed** in development or production, and the 30-day refresh token is never readable by client JavaScript.
+- **Auth model**: stateless signed access tokens (15 min, `itsdangerous` serializer) + revocable rotating refresh tokens (30 days, `jti`-tracked in the `refresh_tokens` table). Password change revokes every outstanding refresh token. Login, register, and refresh endpoints are rate-limited (5/min per IP) via Flask-Limiter.
+- **Caching**: optional Redis layer (TASK-025) caches course/major read models with explicit invalidation on writes; graceful in-memory fallback when `REDIS_URL` is unset.
 
-The API is ready for a mobile client or a future SPA. Authentication endpoints
-return a short-lived signed access token (15 min) plus a revocable refresh
-token (30 days). Send the access token with every protected request as
-`Authorization: Bearer <access_token>`; use `/api/auth/refresh` to rotate the
-pair when the access token expires.
+## Tech Stack
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| POST | `/api/auth/register` | Create a user; return access + refresh tokens |
-| POST | `/api/auth/login` | Sign in; return access + refresh tokens |
-| POST | `/api/auth/refresh` | Rotate refresh token; return a new access + refresh pair |
-| GET / POST | `/api/tasks` | List or create the authenticated user's tasks |
-| PUT / DELETE | `/api/tasks/:id` | Update or remove one owned task |
-| POST | `/api/tasks/:id/sessions` | Start a study session for a task |
-| POST | `/api/tasks/:id/sessions/:sid/stop` | Stop an open study session |
-| GET | `/api/tasks/:id/sessions` | List study sessions for a task |
-| GET | `/api/statistics/dashboard` | Retrieve dashboard metrics |
+| Layer | Technology |
+| --- | --- |
+| Backend | Python 3.12+ · Flask 3.1 · SQLAlchemy 2 · Alembic |
+| Frontend | Next.js 15 (App Router) · React 19 · TypeScript · Tailwind CSS 4 |
+| Database | PostgreSQL 16 (SQLite for the test suite) |
+| Cache / rate-limit store | Redis 7 (optional) |
+| Auth | Bearer access tokens (15 min) + rotating refresh tokens (30 d) |
+| i18n | Custom JSON locale files (`locales/fa.json`, `locales/en.json`) |
+| Testing | pytest (306 tests, in-memory SQLite) + Playwright for docs captures |
+| CI | GitHub Actions: lint, tests (3.12/3.13), PostgreSQL job, coverage gate, frontend build, Docker build/boot |
+| Production server | Gunicorn (`wsgi.py`) behind Docker |
+| Optional translation | LibreTranslate (self-hosted or public) |
 
-The browser routes continue to use session authentication and CSRF protection;
-the mobile API's mutating endpoints accept bearer tokens only.
+## Requirements
 
----
-
-<div dir="rtl">
-
-# 📚 برنامه‌ریز مطالعه | Study Planner
-
-یک اپلیکیشن وب برای ردیابی و مدیریت برنامه مطالعه دانشجویان، ساخته شده با Flask و PostgreSQL.
-پشتیبانی کامل از **فارسی و انگلیسی** با سیستم i18n سفارشی.
-
-> **شفافیت:** معماری دیتابیس، سیستم چندزبانه، و ریفکتورینگ کد این پروژه با کمک [Claude](https://claude.ai) (هوش مصنوعی Anthropic) انجام شده. ایده اولیه، طراحی UI، و تصمیمات محصول توسط توسعه‌دهنده گرفته شده. هوش مصنوعی به عنوان یک ابزار قدرتمند استفاده شد، نه جایگزین مهندسی.
-
-</div>
-
----
-
-<div dir="rtl">
-
-## ✨ ویژگی‌ها
-
-### مدیریت تسک و مطالعه
-- 📝 افزودن تسک‌های درسی با سطح اولویت (مهم / متوسط / کم)
-- ⏱️ ثبت ساعت مطالعه برای هر درس
-- ✅ تیک زدن و پیگیری پیشرفت تسک‌ها
-- ✏️ ویرایش و حذف تسک‌ها
-
-### آمار و نمودار
-- 📊 نمودار ساعت مطالعه هفتگی (bar chart)
-- 📈 نمودار ساعت مطالعه ماهانه (line chart)
-- 📉 آمار پیشرفت هر درس به صورت جداگانه
-- 🔢 نمایش ساعت مطالعه امروز، این هفته، و این ماه
-
-### کاربران و اجتماع
-- 👥 مشاهده پروفایل و پیشرفت سایر کاربران
-- 🏆 مقایسه ساعت مطالعه با همکلاسی‌ها
-
-### امنیت و احراز هویت
-- 🔐 رمز عبور هش می‌شود (ذخیره ایمن با Werkzeug)
-- 🛡️ محافظت از روت‌ها با decorator های login_required و admin_required
-- 👮 پنل ادمین جداگانه با دسترسی محدود
-
-### چندزبانه
-- 🌐 پشتیبانی کامل از **فارسی (RTL) و انگلیسی (LTR)**
-- 🔄 تغییر زبان از هر صفحه بدون از دست دادن اطلاعات
-- 🤖 ترجمه خودکار نام رشته‌ها و دروس هنگام ورود (با LibreTranslate)
-- 📁 سیستم locale با فایل‌های JSON قابل توسعه
-
-### ادمین
-- 👤 مدیریت کاربران (حذف، تغییر رمز)
-- 🏫 مدیریت رشته‌ها و دروس (افزودن، حذف)
-- 📊 آمار کلی سیستم (کاربران فعال، کل تسک‌ها، ساعت مطالعه)
-
-### تجربه کاربری
-- 🌙 تم تاریک / روشن (ذخیره در دیتابیس)
-- 📱 طراحی واکنش‌گرا (موبایل و دسکتاپ)
-- ⚡ انیمیشن‌های روان در UI
-
-</div>
-
----
-
-## ✨ Features
-
-- 📝 Task management per course with priority levels (High / Medium / Low)
-- ⏱️ Study hour tracking with daily, weekly, and monthly breakdowns
-- 📊 Interactive charts (weekly bar + monthly line) powered by Chart.js
-- 👥 Social view — see other users' progress and study hours
-- 🔐 Secure hashed passwords (Werkzeug)
-- 🌙 Dark / Light theme toggle, saved per user
-- 🌐 Full **Persian ↔ English** i18n with RTL/LTR layout switching
-- 🤖 Auto-translate major/course names via LibreTranslate
-- 🛡️ Admin panel — user management, majors, courses, system stats
-- 🗄️ PostgreSQL + SQLAlchemy ORM, schema managed by Alembic migrations
-
----
-
-<div dir="rtl">
-
-## 🏗️ تکنولوژی‌ها
-
-| لایه        | تکنولوژی                        |
-|-------------|----------------------------------|
-| بک‌اند      | Python 3.10+ / Flask 3.0         |
-| دیتابیس     | PostgreSQL 14+ / SQLAlchemy 2.0  |
-| فرانت‌اند   | Bootstrap 5 / Chart.js           |
-| ترجمه خودکار| LibreTranslate (self-hosted)     |
-| i18n        | سیستم JSON locale سفارشی         |
-| استقرار     | Gunicorn                         |
-
-</div>
-
-## 🏗️ Tech Stack
-
-| Layer       | Technology                      |
-|-------------|----------------------------------|
-| Backend     | Python 3.10+ / Flask 3.0        |
-| Database    | PostgreSQL 14+ / SQLAlchemy 2.0 |
-| Frontend    | Bootstrap 5 / Chart.js          |
-| Translation | LibreTranslate (self-hosted)    |
-| i18n        | Custom JSON locale system       |
-| Deployment  | Gunicorn                        |
-
----
-
-<div dir="rtl">
-
-## 🚀 راه‌اندازی صفر تا صد
-
-### پیش‌نیازها
-
-قبل از شروع مطمئن شو این‌ها نصب هستن:
-
-- [Python 3.10+](https://www.python.org/downloads/)
-- [PostgreSQL 14+](https://www.postgresql.org/download/) + pgAdmin (اختیاری)
+- Python 3.12+
+- Node.js 20+ and npm 11
+- PostgreSQL 14+ (or use Docker, which brings its own)
+- Redis 7 (optional — caching and shared rate-limit storage degrade gracefully without it)
 - Git
 
----
+## Quick Start (manual)
 
-### مرحله ۱ — دریافت کد
+### 1. Clone and install
 
-```bash
-git clone https://github.com/Hosseinamiri850/study_planner.git
-cd study_planner
-```
-
----
-
-### مرحله ۲ — نصب وابستگی‌ها
-
-```bash
-pip install -r requirements.txt
-```
-
-خروجی موفق این‌ها رو نصب می‌کنه:
-- `Flask 3.0`
-- `Flask-SQLAlchemy 3.1`
-- `psycopg[binary]` (درایور PostgreSQL)
-- `requests` (برای LibreTranslate)
-- `gunicorn` (سرور production)
-
----
-
-### مرحله ۳ — ساخت دیتابیس
-
-**روش A — با pgAdmin (گرافیکی):**
-1. pgAdmin رو باز کن
-2. روی `Servers` ← `PostgreSQL` کلیک راست کن
-3. `Create` ← `Database` رو انتخاب کن
-4. نام `study_planner` بذار و Save کن
-
-**روش B — با خط فرمان:**
-```bash
-# ویندوز (PowerShell):
-psql -U postgres -c "CREATE DATABASE study_planner;"
-
-# لینوکس/مک:
-createdb study_planner
-```
-
----
-
-### مرحله ۳ — تنظیم اتصال دیتابیس
-
-فایل `.env.example` رو به `.env` کپی کن و مقادیر خودت رو وارد کن:
-
-```bash
-cp .env.example .env
-```
-
-حداقل این متغیرها رو تنظیم کن (`.env` هرگز commit نشه):
-
-```bash
-SECRET_KEY=یک-رشته-طولانی-تصادفی-و-مخفی
-DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
-# اختیاری برای production: ذخیره‌سازی rate-limit در Redis
-RATELIMIT_STORAGE_URI=redis://localhost:6379/1
-```
-
-> `SECRET_KEY` الزامی است؛ برنامه بدون آن راه‌اندازی نمی‌شود.
-> rate-limit پیش‌فرض در حافظه ذخیره می‌شود؛ برای production مقدار `RATELIMIT_STORAGE_URI`
-> را به Redis تنظیم کن.
-
----
-
-### مرحله ۴ — اجرای migration و seed
-
-برخلاف نسخه‌های قدیمی، برنامه دیگر جداول را به‌صورت خودکار **نمی‌سازد** و اکانت ادمین
-پیش‌فرض **ایجاد نمی‌کند**. مراحل زیر را به‌ترتیب اجرا کن:
-
-```bash
-flask --app app db upgrade        # ساختن/به‌روزرسانی جداول از طریق Alembic
-flask --app app seed-reference-data  # اختیاری: رشته و ۱۳ درس پیش‌فرض کامپیوتر
-```
-
-سپس یک ادمین بساز (برای ورود به پنل مدیریت):
-
-```bash
-flask --app app create-admin <username>
-# از شما رمز عبور می‌خواهد (نمایش داده نمی‌شود) و آن را هش‌شده ذخیره می‌کند
-```
-
-> برنامه به‌صورت عمدی هیچ اکانت `admin/admin` پیش‌فرض نمی‌سازد. ادمین فقط از طریق
-> دستور `create-admin` ساخته می‌شود.
-
----
-
-### مرحله ۵ — اجرا
-
-```bash
-python app.py
-```
-
-مرورگر رو باز کن و برو به:
-
----
-
-### روش جایگزین — اجرا با Docker
-
-نیازی به نصب دستی PostgreSQL نیست؛ PostgreSQL و Redis و برنامه رو با هم بالا بیار:
-```bash
-docker compose up --build --wait
-```
-ترتیب بوت: کانتینر `init` یک‌بار migration‌ها + seed مرجع رو اجرا می‌کنه (idempotent — اجرای دوباره چیزی تکرار نمی‌کنه)، بعد سرویس `app` بالا میاد و gunicorn روی پورت ۵۰۰۰ سرو می‌ده. ایمیج‌ها با digest پین شدن؛ healthcheck به `/healthz` وصله.
-
-ساختن ادمین داخل کانتینر در حال اجرا:
-```bash
-docker compose exec app flask --app app create-admin <username>
-```
-
-متغیرهای محیطی که اپ می‌خونه همه در `.env.example` مستند شدن.
-
-مرورگر رو باز کن و برو به:
-```
-http://localhost:5000
-```
-
----
-
-### مرحله ۶ (اختیاری) — فعال‌سازی ترجمه خودکار
-
-برای ترجمه خودکار فارسی↔انگلیسی هنگام افزودن رشته/درس:
-
-```bash
-# نصب LibreTranslate
-pip install libretranslate
-
-# اجرا (در یه terminal جداگانه)
-libretranslate --host 0.0.0.0 --port 5001
-```
-
-یا اگه نمی‌خوای self-hosted باشه، از public instance استفاده کن — فایل `app/integrations/translator.py` رو باز کن و این خط رو عوض کن:
-
-```python
-LIBRETRANSLATE_URL = "https://translate.argosopentech.com"
-```
-
-بدون LibreTranslate هم برنامه کاملاً کار می‌کنه — فقط ترجمه خودکار غیرفعاله و باید هر دو فیلد فارسی و انگلیسی رو دستی پر کنی.
-
----
-
-### مرحله ۷ (اختیاری) — استقرار با Gunicorn
-
-```bash
-gunicorn -w 4 -b 0.0.0.0:8000 app:app
-```
-
-> در محیط production حتماً یک `SECRET_KEY` قوی و `DATABASE_URL` مناسب را از طریق
-> متغیرهای محیطی تنظیم کن و migration‌ها را قبل از اجرا اعمال کن
-> (`flask --app app db upgrade`).
-
-</div>
-
-## 🚀 Quick Start (English)
-
-### Prerequisites
-- Python 3.10+
-- PostgreSQL 14+
-- Git
-
-### Step 1 — Clone
 ```bash
 git clone https://github.com/Hosseinamiri850/study_planner.git
 cd study_planner
 pip install -r requirements.txt
 ```
 
-### Step 2 — Create Database
-```sql
--- psql or pgAdmin
+### 2. Create the database
+
+```bash
+# psql or pgAdmin
 CREATE DATABASE study_planner;
 ```
 
-### Step 3 — Configure
-Copy `.env.example` to `.env` and set your own values:
+### 3. Configure environment
+
 ```bash
 cp .env.example .env
 ```
+
+Set at minimum (`.env` must never be committed):
+
 ```bash
 SECRET_KEY=a-long-random-secret-string
-DATABASE_URL="postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner"
-# optional, production: Redis-backed rate-limit storage
-RATELIMIT_STORAGE_URI=redis://localhost:6379/1
+DATABASE_URL=postgresql+psycopg://postgres:YOUR_PASSWORD@localhost:5432/study_planner
 ```
-`SECRET_KEY` is required; the app refuses to start without it. Auth endpoints
-(`/login`, `/register`, `/api/auth/*`) are rate-limited to 5 requests/minute
-per IP; in production point `RATELIMIT_STORAGE_URI` at Redis so limits survive
-restarts and are shared across workers.
 
-### Step 4 — Migrate, seed, and create an admin
+Optional but recommended in production:
+
 ```bash
-flask --app app db upgrade            # create/update tables via Alembic
-flask --app app seed-reference-data   # optional: bundled CS majors & courses
-flask --app app create-admin <username>   # prompts for a password, hashes it
-```
-The app no longer auto-creates tables or seeds any default `admin/admin` account.
-Create an admin explicitly via the `create-admin` command above.
+# Cache + shared rate-limit storage (in-memory fallback otherwise)
+REDIS_URL=redis://localhost:6379/0
+RATELIMIT_STORAGE_URI=redis://localhost:6379/1
 
-### Step 5 — Run
+# Session cookies over TLS (behind an HTTPS proxy)
+SESSION_COOKIE_SECURE=true
+
+# Optional error monitoring
+SENTRY_DSN=
+
+# Optional auto-translation of major/course names
+LIBRETRANSLATE_URL=http://localhost:5001
+```
+
+The full list of variables the backend reads is documented in [.env.example](.env.example).
+
+### 4. Migrate and seed
+
+```bash
+flask --app app db upgrade          # create/update tables via Alembic
+flask --app app seed-reference-data # optional: bundled majors + 13 CS courses
+flask --app app create-admin <username>  # prompts for a password (hidden), hashes it
+```
+
+The app deliberately creates **no default admin account** and never auto-creates tables at startup — schema changes only happen through Alembic migrations, and admins only via the `create-admin` command (or `--promote` for an existing user).
+
+### 5. Run the backend
+
 ```bash
 python app.py
+# or, production-style:
+gunicorn -w 4 -b 0.0.0.0:8000 wsgi:app
 ```
-Open → [http://localhost:5000](http://localhost:5000)
 
-### Alternative — one-shot with Docker
+Flask serves the API on port 5000 by default in dev.
 
-Skip manual PostgreSQL setup; bring up Postgres + Redis + app together:
+### 6. Run the frontend
+
 ```bash
-docker compose up --build
+cd frontend
+npm install
+cp .env.example .env.local   # optional: API_BASE_URL defaults to http://127.0.0.1:5000
+npm run dev
 ```
-The image runs migrations on boot, then serves gunicorn on port 5000.
+
+Open [http://localhost:3000](http://localhost:3000). Register a normal user or sign in as the admin you created.
+
+## Quick Start (Docker)
+
+Docker Compose brings up PostgreSQL, Redis, a one-shot **init** container (migrations + idempotent reference-data seeding), and the Flask app:
+
+```bash
+docker compose up --build --wait
+```
+
+- The `init` service runs `flask db upgrade` + `seed-reference-data` exactly once, exits, and only then does the `app` service start (`service_completed_successfully` dependency).
+- Images are digest-pinned; the app container runs as a non-root user, serves via gunicorn on port **5000**, and answers `/healthz` (liveness) and `/readyz` (DB check) probes.
+
 Create an admin inside the running container:
+
 ```bash
 docker compose exec app flask --app app create-admin <username>
 ```
 
-### Step 5 (Optional) — Auto-translate
-```bash
-pip install libretranslate
-libretranslate --host 0.0.0.0 --port 5001
-```
+> The Compose stack starts the **backend** on port 5000. Run the Next.js frontend separately (step 6 above) — its `API_BASE_URL` default already points at `http://127.0.0.1:5000`.
 
----
+## Database backups
 
-<div dir="rtl">
-
-## 🗃️ ساختار دیتابیس
-
-```
-users           — id, username, password (hashed), fullname, is_admin, theme, created_at
-majors          — id, key (slug), name_fa, name_en
-courses         — id, key (slug), name_fa, name_en, major_id
-tasks           — id, user_id, course_id, course_key, title, description, priority,
-                  status, hours, estimated_hours, done, created_at, completed_at
-study_sessions  — id, task_id, duration, started_at, ended_at
-```
-
-رشته‌ها و دروس با **هر دو نام فارسی و انگلیسی** ذخیره می‌شن.
-تسک‌ها `course_key` (یه slug زبان‌خنثی) ذخیره می‌کنن تا در هر زبانی درست نمایش داده بشن.
-ستون‌های قدیمی (`course_key`, `hours`, `done`) در کنار ستون‌های نرمال‌سازی‌شده
-(`course_id`, `estimated_hours`, `status`) برای سازگاری با داده‌های قدیمی حفظ شده‌اند.
-
-</div>
-
-## 🗃️ Database Schema
-
-```
-users           — id, username, password (hashed), fullname, is_admin, theme, created_at
-majors          — id, key (slug), name_fa, name_en
-courses         — id, key (slug), name_fa, name_en, major_id
-tasks           — id, user_id, course_id, course_key, title, description, priority,
-                  status, hours, estimated_hours, done, created_at, completed_at
-study_sessions  — id, task_id, duration, started_at, ended_at
-```
-
-Legacy columns (`course_key`, `hours`, `done`) are retained alongside the
-normalized ones (`course_id`, `estimated_hours`, `status`) for compatibility
-with pre-migration data. |
-
----
-
-## 🗃️ Database backups
-
-`scripts/backup.sh` dumps the configured PostgreSQL database to a timestamped
-file and prunes dumps older than `BACKUP_RETENTION_DAYS` (default 14). It is
-safe to run repeatedly and designed for cron.
+`scripts/backup.sh` dumps the configured PostgreSQL database to a timestamped file and prunes dumps older than `BACKUP_RETENTION_DAYS` (default 14). Safe to run repeatedly; designed for cron.
 
 ```bash
 # One-off (reads DATABASE_URL or PG* env vars):
@@ -464,111 +177,113 @@ DATABASE_URL=postgresql://user:pass@localhost:5432/study_planner \
   /path/to/study_planner/scripts/backup.sh >> /var/log/study_planner_backup.log 2>&1
 ```
 
-Only one of `DATABASE_URL` or the individual `PGHOST`/`PGPORT`/`PGUSER`/
-`PGDATABASE` variables is required. Set `GZIP=0` to skip gzip. Verify
-restores on a throwaway database before relying on this for production.
+Set `GZIP=0` to skip gzip. Verify restores on a throwaway database before relying on this in production.
 
----
+## Testing / linting / build
 
-<div dir="rtl">
-
-## 📁 ساختار پروژه
-
-```
-study_planner/
-├── app/                ← پکیج Flask (routes/, models/, services/, utils/)
-├── app.py              ← نقطه ورود dev (create_app را صدا می‌زند)
-├── app/integrations/translator.py  ← ماژول ترجمه LibreTranslate
-├── requirements.txt
-├── .gitignore
-├── README.md
-├── locales/
-│   ├── fa.json         ← همه متن‌های فارسی UI
-│   └── en.json         ← همه متن‌های انگلیسی UI
-└── templates/
-    ├── base.html       ← base template + JS ترجمه خودکار
-    ├── login.html
-    ├── register.html
-    ├── dashboard.html
-    ├── admin.html
-    └── view_user.html
-```
-
-## افزودن زبان جدید
-
-۱. فایل `locales/en.json` رو کپی کن به `locales/xx.json`
-۲. همه مقادیر رو ترجمه کن
-۳. در `app.py` مقدار `"xx"` رو به `SUPPORTED_LANGS` اضافه کن
-
-</div>
-
-## 📁 Project Structure
-
-```
-study_planner/
-├── app/                ← Flask package (routes/, models/, services/, utils/)
-├── app.py              ← Thin dev entry point (calls create_app)
-├── app/integrations/translator.py  ← LibreTranslate integration
-├── requirements.txt
-├── .gitignore
-├── README.md
-├── locales/
-│   ├── fa.json         ← Persian UI strings
-│   └── en.json         ← English UI strings
-└── templates/
-    ├── base.html       ← Base template + AutoTranslate JS
-    ├── login.html
-    ├── register.html
-    ├── dashboard.html
-    ├── admin.html
-    └── view_user.html
-```
-
----
-
-<div dir="rtl">
-
-## 👤 ساخت ادمین
-
-برنامه به‌صورت عمدی هیچ اکانت ادمین پیش‌فرضی نمی‌سازد. برای دسترسی به پنل مدیریت،
-یک ادمین از طریق دستور زیر بساز:
+Backend (from the repo root):
 
 ```bash
-flask --app app create-admin <username>
+pytest                       # 306 tests, in-memory SQLite
+pytest --cov=app --cov-report=term-missing   # coverage (CI gates at 85%)
+ruff check app/ tests/       # lint
 ```
 
-> این دستور رمز عبور را درخواست می‌کند (نمایش داده نمی‌شود)، آن را هش کرده و
-> کاربر را با نقش ادمین ثبت می‌کند.
-
-</div>
-
-## 👤 Creating an Admin
-
-The app deliberately creates **no default admin account**. Create one explicitly
-via the CLI command before accessing the admin panel:
+Frontend (from `frontend/`):
 
 ```bash
-flask --app app create-admin <username>
+npm run lint       # eslint
+npm run typecheck  # tsc --noEmit
+npm run build      # production build (13 routes)
 ```
 
-> Prompts for a password (hidden), hashes it, and creates the user with admin role.
+CI (`.github/workflows/ci.yml`) runs lint + tests on Python 3.12/3.13, a PostgreSQL-backed test job, the coverage gate, the frontend typecheck/build, and a Docker build-and-boot job with health checks.
 
----
+## Authentication model
 
-<div dir="rtl">
+Two parallel systems, both intentional:
 
-## 🤝 مشارکت
+- **Browser (server-rendered admin routes)**: Flask session cookie, CSRF-protected forms.
+- **SPA (Next.js frontend + JSON API)**: the SPA holds a 15-minute access token **in memory only**; the 30-day refresh token lives in an `HttpOnly; SameSite=Lax` cookie managed by Next route handlers, and is **stripped from every JSON response body**. On app load the frontend transparently refreshes via `POST /api/auth/refresh` (which rotates the token). `POST /api/auth/logout` revokes the presented refresh token and is idempotent.
 
-Pull request ها خوش‌آمد هستند. برای تغییرات بزرگ اول یه issue باز کن.
+The API never trusts the browser session, and the SPA never touches the session cookie — each system stands alone.
 
-</div>
+## REST API overview
 
-## 🤝 Contributing
+All protected endpoints expect `Authorization: Bearer <access_token>`. Errors are consistently shaped `{"error": "message"}` with appropriate status codes. When the access token expires, use the refresh pair instead of re-logging-in.
 
-Pull requests are welcome. For major changes, please open an issue first.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/api/auth/register` | Create a user; returns access token (refresh token → cookie via proxy) |
+| POST | `/api/auth/login` | Sign in; same token shape |
+| POST | `/api/auth/refresh` | Rotate refresh token; new access + refresh pair |
+| POST | `/api/auth/logout` | Revoke the presented refresh token (idempotent, 204) |
+| GET | `/api/me` | Current user (id, username, fullname, is_admin, theme) |
+| PUT | `/api/me` | Update fullname / theme; password change revokes refresh tokens |
+| GET / POST | `/api/tasks` | List (paginated, includes `open_session_id`) / create tasks |
+| PUT / DELETE | `/api/tasks/:id` | Update / delete one owned task (404 for others') |
+| POST | `/api/tasks/:id/sessions` | Start a study session (409 if one is already open) |
+| POST | `/api/tasks/:id/sessions/:sid/stop` | Stop an open session |
+| GET | `/api/tasks/:id/sessions` | Sessions for a task |
+| GET | `/api/statistics/dashboard` | Aggregated stats from real session data |
+| GET | `/api/courses` · `/api/majors` | Catalog reads (authenticated) |
+| POST / PUT / DELETE | `/api/courses…`, `/api/majors…` | Admin-only catalog CRUD |
+| POST | `/api/translate` | Auto-translate a name (optional LibreTranslate) |
+| GET | `/healthz` · `/readyz` | Liveness / readiness probes |
 
----
+## Admin functionality
 
-## 📄 License
+Admins get the `/app/admin` screen in the SPA: create, rename, and delete majors and courses, with confirmation dialogs on destructive actions. Admin state comes from `is_admin` on `/api/me` and is used **only for UI gating** — every admin mutation is re-authorized server-side (`403` for non-admins), and catalog reads are available to all authenticated users. The server-rendered `/admin` blueprint remains for direct browser use.
+
+## Project structure
+
+```text
+study_planner/
+├── app/                    # Flask package
+│   ├── __init__.py         # create_app factory + CLI commands
+│   ├── config.py           # env-backed configuration
+│   ├── extensions.py       # db, migrate, csrf, limiter
+│   ├── models/             # User, Major, Course, Task, StudySession
+│   ├── repositories/       # data access behind read/write session seam
+│   ├── routes/             # web, admin, api blueprints
+│   ├── services/           # statistics, seed
+│   ├── integrations/       # LibreTranslate client
+│   └── utils/              # auth, caching, i18n, logging, validation
+├── frontend/               # Next.js 15 SPA (App Router, TypeScript, Tailwind)
+│   ├── app/                # routes: /, /login, /register, /app, /app/admin, /app/profile
+│   ├── app/api/            # route handlers proxying Flask (+ cookie handling)
+│   ├── components/         # shared UI
+│   ├── lib/                # typed API client, contexts (auth, lang, theme)
+│   └── locales/            # synced copies of locales/{fa,en}.json
+├── locales/                # fa.json / en.json — single source of truth for UI strings
+├── migrations/             # Alembic revisions
+├── templates/              # server-rendered admin/browser pages
+├── tests/                  # pytest suite
+├── scripts/backup.sh       # PostgreSQL backup with retention
+├── docker-compose.yml      # db + redis + init + app
+├── Dockerfile              # digest-pinned, non-root, healthchecked
+└── docs/
+    ├── user-guide.md       # end-user documentation
+    ├── knowledge-graph.md  # architecture diagrams
+    └── screenshots/        # real UI captures used in this README
+```
+
+## Internationalization
+
+User-facing strings live in `locales/fa.json` and `locales/en.json` (keys synced; `frontend/locales/` is a generated copy). Language switching happens without losing page state; RTL is applied automatically for Persian. To add a language: copy `locales/en.json` → `locales/xx.json`, translate, and add `"xx"` to `SUPPORTED_LANGS` in `app/utils/i18n.py`.
+
+## Known limitations / post-v1 items
+
+- **No RBAC** — authorization is the single `User.is_admin` flag; no fine-grained roles or permission tables (TASK-037/038, planned post-v1).
+- **No audit trail database** — structured JSON logs exist, but no independent audit log of before/after changes on core tables (TASK-035/036, post-v1).
+- **Legacy columns retained** — `Task.course_key` / `hours` / `done` are kept alongside the normalized `course_id` / `estimated_hours` / `status` for pre-migration data compatibility, until an explicit decision + migration drops them.
+- **LibreTranslate is optional** — without it, auto-translation is disabled and both language fields must be filled manually; the app works fully either way.
+- **Docker Compose runs the backend only** — the Next.js frontend is deployed separately (see Quick Start).
+
+## Contributing
+
+Pull requests are welcome. For major changes, please open an issue first. Working conventions live in [CLAUDE.md](CLAUDE.md).
+
+## License
 
 MIT © [Hossein Amiri](https://github.com/Hosseinamiri850)
