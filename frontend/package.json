@@ -28,6 +28,9 @@
     "typescript": "^5"
   },
   "overrides": {
-    "postcss": "^8.5.26"
+    "postcss": "^8.5.26",
+    "@emnapi/runtime": "1.11.3",
+    "@emnapi/core": "1.11.3",
+    "@emnapi/wasi-threads": "1.2.3"
   }
 }
