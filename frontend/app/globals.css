@@ -12,7 +12,10 @@
 :root {
   /* Fonts (wired via next/font/local in app/layout.tsx) */
   --font-sans: var(--font-vazirmatn), "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
-  --font-display: var(--font-space-grotesk), "Segoe UI", sans-serif;
+  /* Per-glyph fallback: Latin renders in Space Grotesk, Persian glyphs
+   * (digits + words) fall through to Vazirmatn — Space Grotesk has no
+   * Arabic-script coverage, so the value must not hit system fonts. */
+  --font-display: var(--font-space-grotesk), var(--font-vazirmatn), "Vazirmatn", sans-serif;
 
   /* Surfaces (light: paper-leaning neutrals) */
   --color-bg: oklch(0.985 0.003 80); /* slate-50-equivalent warmth */
