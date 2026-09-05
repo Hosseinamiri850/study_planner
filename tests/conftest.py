@@ -13,7 +13,7 @@ from werkzeug.security import generate_password_hash
 from app import create_app
 from app.extensions import db
 from app.integrations import translator as translator_mod
-from app.models import Course, Major, StudySession, Task, User
+from app.models import Class, Course, Institution, Major, StudySession, Task, User
 
 
 @pytest.fixture(autouse=True)
@@ -118,6 +118,36 @@ def create_course(app, create_major):
         db.session.commit()
         return course
     return _create_course
+
+
+@pytest.fixture
+def create_institution(app):
+    counter = {"n": 0}
+    def _create_institution(name=None, type="school", plan_tier="free"):
+        counter["n"] += 1
+        if name is None:
+            name = f"Institution {counter['n']}"
+        institution = Institution(name=name, type=type, plan_tier=plan_tier)
+        db.session.add(institution)
+        db.session.commit()
+        return institution
+    return _create_institution
+
+
+@pytest.fixture
+def create_class(app, create_institution):
+    counter = {"n": 0}
+    def _create_class(institution=None, name=None, grade_level=None):
+        counter["n"] += 1
+        if institution is None:
+            institution = create_institution()
+        if name is None:
+            name = f"Class {counter['n']}"
+        klass = Class(institution_id=institution.id, name=name, grade_level=grade_level)
+        db.session.add(klass)
+        db.session.commit()
+        return klass
+    return _create_class
 
 
 @pytest.fixture

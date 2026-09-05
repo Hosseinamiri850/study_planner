@@ -9,7 +9,9 @@ no replica is configured here — the read/write split seam is exercised in
 from datetime import date
 
 from app.repositories import (
+    ClassRepo,
     CourseRepo,
+    InstitutionRepo,
     MajorRepo,
     RefreshTokenRepo,
     TaskRepo,
@@ -286,6 +288,73 @@ class TestUserRepo:
 
     def test_delete_missing_is_noop(self, app):
         assert UserRepo.delete(999999) is False
+
+
+class TestInstitutionRepo:
+    def test_create_and_get(self, create_institution):
+        institution = InstitutionRepo.create(name="Repo School", type="university", plan_tier="pro")
+        fetched = InstitutionRepo.get(institution.id)
+        assert fetched.id == institution.id
+        assert fetched.name == "Repo School"
+        assert fetched.type == "university"
+        assert fetched.plan_tier == "pro"
+
+    def test_create_defaults_plan_tier(self, app):
+        institution = InstitutionRepo.create(name="Default Tier", type="academy")
+        assert institution.plan_tier == "free"
+
+    def test_list_all_ordered_by_name(self, app):
+        InstitutionRepo.create(name="Zeta", type="school")
+        InstitutionRepo.create(name="Alpha", type="school")
+        names = [i.name for i in InstitutionRepo.list_all()]
+        assert names == sorted(names)
+        assert "Alpha" in names and "Zeta" in names
+
+    def test_get_for_write_and_delete(self, create_institution):
+        institution = create_institution(name="Doomed")
+        writable = InstitutionRepo.get_for_write(institution.id)
+        assert writable.id == institution.id
+        InstitutionRepo.delete(writable)
+        assert InstitutionRepo.get(institution.id) is None
+
+
+class TestClassRepo:
+    def test_create_and_get(self, create_institution):
+        institution = create_institution(name="Host School")
+        klass = ClassRepo.create(institution_id=institution.id, name="Grade 9", grade_level="9")
+        fetched = ClassRepo.get(klass.id)
+        assert fetched.id == klass.id
+        assert fetched.institution_id == institution.id
+        assert fetched.name == "Grade 9"
+        assert fetched.grade_level == "9"
+
+    def test_create_grade_level_optional(self, create_institution):
+        institution = create_institution()
+        klass = ClassRepo.create(institution_id=institution.id, name="Ungraded")
+        assert klass.grade_level is None
+
+    def test_list_for_institution_scoped_and_ordered(self, app, create_institution):
+        inst_a, inst_b = create_institution(name="A"), create_institution(name="B")
+        ClassRepo.create(institution_id=inst_a.id, name="A-first")
+        ClassRepo.create(institution_id=inst_a.id, name="A-second")
+        ClassRepo.create(institution_id=inst_b.id, name="B-other")
+        names = [k.name for k in ClassRepo.list_for_institution(inst_a.id)]
+        # newest-first (created_at desc, then id desc for same-day rows)
+        assert names == ["A-second", "A-first"]
+        assert all(k.institution_id == inst_a.id for k in ClassRepo.list_for_institution(inst_a.id))
+
+    def test_update_fields_no_commit(self, create_class):
+        klass = create_class(name="Before", grade_level="7")
+        ClassRepo.update_fields(klass, name="After", grade_level="8")
+        ClassRepo.commit()
+        fetched = ClassRepo.get(klass.id)
+        assert fetched.name == "After"
+        assert fetched.grade_level == "8"
+
+    def test_delete(self, create_class):
+        klass = create_class(name="Doomed Class")
+        ClassRepo.delete(klass)
+        assert ClassRepo.get(klass.id) is None
 
     def test_update_password(self, app, create_user):
         user = create_user(username="pw")

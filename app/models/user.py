@@ -22,10 +22,11 @@ class User(db.Model):
     password = db.Column(db.String(255), nullable=False)
     fullname = db.Column(db.String(150), nullable=False)
     role = db.Column(db.String(20), default=ROLE_STUDENT, nullable=False, index=True)
-    # Multi-tenancy foundation: which institution the user belongs to.
-    # Plain integer for now — the institutions table (and FK constraint)
-    # arrives with the Institution feature itself.
-    institution_id = db.Column(db.Integer, nullable=True)
+    # Multi-tenancy: which institution the user belongs to, and (for
+    # students/teachers) which class within it. Both nullable — B2C users
+    # stay unattached.
+    institution_id = db.Column(db.Integer, db.ForeignKey("institutions.id"), nullable=True)
+    class_id = db.Column(db.Integer, db.ForeignKey("classes.id"), nullable=True)
     theme = db.Column(db.String(10), default="dark", nullable=False)
     created_at = db.Column(db.Date, default=date.today, nullable=False)
     tasks = db.relationship("Task", back_populates="user", cascade="all, delete-orphan", lazy="dynamic")
