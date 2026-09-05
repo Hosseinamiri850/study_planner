@@ -9,6 +9,7 @@ implementation result.
 """
 
 from app.models import User
+from app.models.user import ROLE_SITE_ADMIN, ROLE_STUDENT
 from app.repositories.base import Repo
 
 
@@ -32,15 +33,15 @@ class UserRepo(Repo):
 
     @classmethod
     def list_non_admin(cls):
-        return cls._read().query(User).filter(User.is_admin.is_(False)).all()
+        return cls._read().query(User).filter(User.role != ROLE_SITE_ADMIN).all()
 
     @classmethod
     def list_admin(cls):
-        return cls._read().query(User).filter(User.is_admin.is_(True)).all()
+        return cls._read().query(User).filter(User.role == ROLE_SITE_ADMIN).all()
 
     @classmethod
     def first_admin(cls):
-        return cls._read().query(User).filter(User.is_admin.is_(True)).first()
+        return cls._read().query(User).filter(User.role == ROLE_SITE_ADMIN).first()
 
     # --- writes ---
 
@@ -50,7 +51,7 @@ class UserRepo(Repo):
             username=username,
             password=password_hash,
             fullname=fullname,
-            is_admin=is_admin,
+            role=ROLE_SITE_ADMIN if is_admin else ROLE_STUDENT,
         )
         cls._write().add(user)
         cls._write().commit()

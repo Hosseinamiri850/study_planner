@@ -137,7 +137,7 @@ class TestCourseCrud:
 
     def test_admin_deletes_course_preserves_tasks(self, client, create_user, create_major):
         login_admin(client, create_user)
-        admin = User.query.filter_by(is_admin=True).first()
+        admin = User.query.filter_by(role="site_admin").first()
         # Create a real course and a task attached to it.
         major = create_major()
         course = Course(key="doomed_course", name_fa="dc", name_en="Doomed Course", major_id=major.id)

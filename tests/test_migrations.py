@@ -13,6 +13,8 @@ from datetime import date
 from pathlib import Path
 
 import pytest
+from alembic.migration import MigrationContext
+from alembic.operations import Operations
 
 from app.extensions import db
 
@@ -86,3 +88,94 @@ def test_downgrade_removes_synthesized_only(migration, create_user, create_cours
     migration.downgrade()
     remaining = db.session.execute(db.text("SELECT task_id FROM study_sessions")).fetchall()
     assert [r[0] for r in remaining] == [survivor_task.id]
+
+
+# --- 20260906_01: User.role + institution_id replacing is_admin ---
+
+_ROLES_MIGRATION_PATH = Path(__file__).resolve().parents[1] / "migrations" / "versions" / "20260906_01_user_roles_institution.py"
+
+
+def _load_roles_migration():
+    spec = importlib.util.spec_from_file_location("user_roles_migration", _ROLES_MIGRATION_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def roles_migration(app):
+    """Load the roles migration and bind its `op` proxy to the test DB.
+
+    The 20260829_01 fixture only patches op.get_bind() — enough there since
+    that migration runs raw SQL. This one calls op.add_column/drop_column,
+    which need a real Operations proxy. A dedicated AUTOCOMMIT connection is
+    used (not db.session.connection()): test fixtures commit in between,
+    which would release/close a session connection under NullPool mid-test,
+    and the session's own connection must be able to see the migration's
+    DDL immediately afterwards."""
+    module = _load_roles_migration()
+    conn = db.engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+    ctx = MigrationContext.configure(conn)
+    module.op = Operations(ctx)
+    yield module
+    conn.close()
+
+
+def _reshape_to_pre_roles_schema():
+    """Reshape the freshly created schema back to the pre-migration state:
+    drop role/institution_id, restore the legacy is_admin boolean. Must run
+    AFTER seeding users (the ORM INSERT references the new columns) and
+    BEFORE the migration — conftest uses db.create_all(), so the migration
+    under test runs against the exact state production rows are in."""
+    db.session.execute(db.text("DROP INDEX IF EXISTS ix_users_role"))
+    db.session.execute(db.text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
+    # Carry the admin bit over from role BEFORE dropping it, mirroring what
+    # a real pre-migration database holds in its is_admin column.
+    db.session.execute(db.text("UPDATE users SET is_admin = 1 WHERE role = 'site_admin'"))
+    db.session.execute(db.text("ALTER TABLE users DROP COLUMN role"))
+    db.session.execute(db.text("ALTER TABLE users DROP COLUMN institution_id"))
+    db.session.commit()
+
+
+def test_roles_backfill_admin_true_becomes_site_admin(roles_migration, create_user):
+    create_user(username="boss", is_admin=True)
+    _reshape_to_pre_roles_schema()
+    roles_migration.upgrade()
+    role = db.session.execute(db.text("SELECT role FROM users WHERE username='boss'")).scalar()
+    assert role == "site_admin"
+
+
+def test_roles_backfill_admin_false_becomes_student(roles_migration, create_user):
+    create_user(username="pleb")
+    _reshape_to_pre_roles_schema()
+    roles_migration.upgrade()
+    role = db.session.execute(db.text("SELECT role FROM users WHERE username='pleb'")).scalar()
+    assert role == "student"
+
+
+def test_roles_backfill_mixed_population_no_loss(roles_migration, create_user):
+    create_user(username="admin_a", is_admin=True)
+    create_user(username="plain")
+    create_user(username="plain2")
+    _reshape_to_pre_roles_schema()
+    roles_migration.upgrade()
+    rows = db.session.execute(db.text("SELECT username, role, institution_id FROM users")).fetchall()
+    by_name = {r[0]: r for r in rows}
+    assert len(rows) == 3
+    assert by_name["admin_a"][1] == "site_admin"
+    assert by_name["plain"][1] == "student"
+    assert by_name["plain2"][1] == "student"
+    # institution_id arrives nullable and untouched by the backfill.
+    assert all(r[2] is None for r in rows)
+
+
+def test_roles_downgrade_restores_is_admin(roles_migration, create_user):
+    create_user(username="down_admin", is_admin=True)
+    create_user(username="down_plain")
+    _reshape_to_pre_roles_schema()
+    roles_migration.upgrade()
+    roles_migration.downgrade()
+    rows = db.session.execute(db.text("SELECT username, is_admin FROM users")).fetchall()
+    by_name = {r[0]: r[1] for r in rows}
+    assert by_name["down_admin"] in (True, 1)
+    assert by_name["down_plain"] in (False, 0)
