@@ -29,6 +29,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navItems = [
     { href: "/app", label: t("nav.dashboard") },
     ...(user?.is_admin ? [{ href: "/app/admin", label: t("nav.admin_panel") }] : []),
+    ...(user?.role === "school_admin" ? [{ href: "/app/school-admin", label: t("nav.school_admin") }] : []),
     { href: "/app/profile", label: t("profile.title") },
   ];
 

@@ -8,6 +8,10 @@ export interface User {
 
 export interface MeUser extends User {
   is_admin: boolean;
+  /** Role from the RBAC rollout (student/teacher/school_admin/site_admin/
+   * support). Presence does not imply school-admin dashboard access —
+   * the API enforces authorization; this drives UI gating only. */
+  role?: string;
   theme: "dark" | "light";
   created_at: string;
 }
@@ -155,4 +159,56 @@ export interface TranslateResponse {
   en: string;
   detected: "fa" | "en";
   success: boolean;
+}
+
+// --- school admin (institution-scoped) ---
+
+export type UserRole = "student" | "teacher" | "school_admin" | "site_admin" | "support";
+
+export interface SchoolUser {
+  id: number;
+  username: string;
+  fullname: string;
+  role: string;
+  class_id: number | null;
+}
+
+export interface SchoolClass {
+  id: number;
+  institution_id: number;
+  name: string;
+  grade_level: string | null;
+}
+
+export interface SchoolOverview {
+  institution_id: number;
+  students: SchoolUser[];
+  teachers: SchoolUser[];
+  classes: SchoolClass[];
+}
+
+export interface SchoolUsersResponse {
+  users: SchoolUser[];
+}
+
+export interface SchoolClassesResponse {
+  classes: SchoolClass[];
+}
+
+export interface CreateClassInput {
+  name: string;
+  grade_level?: string;
+}
+
+export interface UpdateClassInput {
+  name?: string;
+  grade_level?: string | null;
+}
+
+export interface AssignClassInput {
+  class_id: number | null;
+}
+
+export interface UpdateSchoolUserResponse {
+  user: SchoolUser;
 }

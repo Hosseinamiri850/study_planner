@@ -13,9 +13,11 @@
 
 import { ApiError } from "./errors";
 import type {
+  AssignClassInput,
   AuthResponse,
   Course,
   CourseListResponse,
+  CreateClassInput,
   CreateCourseInput,
   CreateMajorInput,
   CreateTaskInput,
@@ -24,15 +26,21 @@ import type {
   MajorListResponse,
   MeUser,
   RefreshResponse,
+  SchoolClass,
+  SchoolClassesResponse,
+  SchoolOverview,
+  SchoolUsersResponse,
   StudySession,
   StudySessionListResponse,
   Task,
   TaskListPaginatedResponse,
   TaskListResponse,
   TranslateResponse,
+  UpdateClassInput,
   UpdateCourseInput,
   UpdateMajorInput,
   UpdateMeInput,
+  UpdateSchoolUserResponse,
   UpdateTaskInput,
 } from "@/types/api";
 
@@ -166,6 +174,33 @@ export class ApiClient {
 
   deleteMajor(majorId: number): Promise<void> {
     return this.requestVoid(`/api/proxy/majors/${majorId}`, { method: "DELETE" });
+  }
+
+  // --- school admin (institution-scoped) ---
+
+  schoolOverview(): Promise<SchoolOverview> {
+    return this.request("/api/proxy/school/overview");
+  }
+
+  schoolUsers(role?: "student" | "teacher"): Promise<SchoolUsersResponse> {
+    const query = role ? `?role=${role}` : "";
+    return this.request(`/api/proxy/school/users${query}`);
+  }
+
+  schoolClasses(): Promise<SchoolClassesResponse> {
+    return this.request("/api/proxy/school/classes");
+  }
+
+  createSchoolClass(input: CreateClassInput): Promise<{ class: SchoolClass }> {
+    return this.post("/api/proxy/school/classes", input);
+  }
+
+  updateSchoolClass(classId: number, input: UpdateClassInput): Promise<{ class: SchoolClass }> {
+    return this.put(`/api/proxy/school/classes/${classId}`, input);
+  }
+
+  assignSchoolUserClass(userId: number, input: AssignClassInput): Promise<UpdateSchoolUserResponse> {
+    return this.put(`/api/proxy/school/users/${userId}`, input);
   }
 
   // --- translate ---
