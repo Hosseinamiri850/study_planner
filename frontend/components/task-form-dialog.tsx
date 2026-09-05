@@ -1,10 +1,12 @@
 "use client";
 
-/** Create/edit task dialog. Course selector is fed from /api/courses;
- * priority + estimated hours validated client-side (backend re-validates). */
+/** Create/edit task dialog on Radix Dialog: focus trap, scroll lock, Esc,
+ * backdrop cancel — all by construction. Course selector fed from
+ * /api/courses; priority + estimated hours validated client-side (backend
+ * re-validates). Form logic unchanged from the pre-Radix version. */
 
 import { useEffect, useState, type FormEvent } from "react";
-import { createPortal } from "react-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
@@ -48,17 +50,6 @@ export function TaskFormDialog({ open, task, courses, onSaved, onCancel }: TaskF
     setServerError(null);
   }, [open, task, courses]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, onCancel]);
-
-  if (!open || typeof document === "undefined") return null;
-
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     setServerError(null);
@@ -97,67 +88,69 @@ export function TaskFormDialog({ open, task, courses, onSaved, onCancel }: TaskF
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" onClick={onCancel} role="presentation">
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="task-form-title"
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-lg dark:border-slate-700 dark:bg-slate-800"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <h2 id="task-form-title" className="mb-4 text-base font-semibold">
-          {editing ? t("tasks.edit_title") : t("tasks.new_task")}
-        </h2>
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          {serverError && <Alert tone="error">{serverError}</Alert>}
-          <Field label={t("tasks.course")} htmlFor="tf-course" error={fieldErrors.courseKey}>
-            <Select id="tf-course" value={courseKey} onChange={(event) => setCourseKey(event.target.value)}>
-              {courses.map((course) => (
-                <option key={course.key} value={course.key}>
-                  {lang === "fa" ? course.name_fa : course.name_en}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label={t("tasks.task_title")} htmlFor="tf-title">
-            <Input id="tf-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={255} />
-          </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t("tasks.priority")} htmlFor="tf-priority" error={fieldErrors.priority}>
-              <Select id="tf-priority" value={priority} onChange={(event) => setPriority(event.target.value as "low" | "medium" | "high")}>
-                <option value="low">{t("tasks.priority_low")}</option>
-                <option value="medium">{t("tasks.priority_medium")}</option>
-                <option value="high">{t("tasks.priority_high")}</option>
-              </Select>
-            </Field>
-            <Field label={t("tasks.estimated_hours")} htmlFor="tf-hours" error={fieldErrors.hours}>
-              <Input
-                id="tf-hours"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={24}
-                step={0.5}
-                value={hours}
-                onChange={(event) => setHours(event.target.value)}
-              />
-            </Field>
-          </div>
-          <Field label={t("tasks.description")} htmlFor="tf-description">
-            <Textarea id="tf-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
-          </Field>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={onCancel} disabled={submitting}>
-              {t("common.cancel")}
-            </Button>
-            <Button type="submit" loading={submitting}>
-              {editing ? t("common.save") : t("common.create")}
-            </Button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+  return (
+    <Dialog.Root open={open} onOpenChange={(next: boolean) => { if (!next) onCancel(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/50 data-[state=open]:animate-in data-[state=closed]:animate-out" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <Dialog.Content
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-surface border border-border-subtle bg-surface-1 p-5 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out"
+          >
+            <Dialog.Title className="mb-4 text-base font-semibold text-text-primary">
+              {editing ? t("tasks.edit_title") : t("tasks.new_task")}
+            </Dialog.Title>
+            <form onSubmit={onSubmit} className="space-y-4" noValidate>
+              {serverError && <Alert tone="error">{serverError}</Alert>}
+              <Field label={t("tasks.course")} htmlFor="tf-course" error={fieldErrors.courseKey}>
+                <Select id="tf-course" value={courseKey} onChange={(event) => setCourseKey(event.target.value)}>
+                  {courses.map((course) => (
+                    <option key={course.key} value={course.key}>
+                      {lang === "fa" ? course.name_fa : course.name_en}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label={t("tasks.task_title")} htmlFor="tf-title">
+                <Input id="tf-title" value={title} onChange={(event) => setTitle(event.target.value)} maxLength={255} />
+              </Field>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label={t("tasks.priority")} htmlFor="tf-priority" error={fieldErrors.priority}>
+                  <Select id="tf-priority" value={priority} onChange={(event) => setPriority(event.target.value as "low" | "medium" | "high")}>
+                    <option value="low">{t("tasks.priority_low")}</option>
+                    <option value="medium">{t("tasks.priority_medium")}</option>
+                    <option value="high">{t("tasks.priority_high")}</option>
+                  </Select>
+                </Field>
+                <Field label={t("tasks.estimated_hours")} htmlFor="tf-hours" error={fieldErrors.hours}>
+                  <Input
+                    id="tf-hours"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={24}
+                    step={0.5}
+                    value={hours}
+                    onChange={(event) => setHours(event.target.value)}
+                  />
+                </Field>
+              </div>
+              <Field label={t("tasks.description")} htmlFor="tf-description">
+                <Textarea id="tf-description" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />
+              </Field>
+              <div className="flex justify-end gap-2">
+                <Dialog.Close asChild>
+                  <Button type="button" variant="secondary" disabled={submitting}>
+                    {t("common.cancel")}
+                  </Button>
+                </Dialog.Close>
+                <Button type="submit" loading={submitting}>
+                  {editing ? t("common.save") : t("common.create")}
+                </Button>
+              </div>
+            </form>
+          </Dialog.Content>
+        </div>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

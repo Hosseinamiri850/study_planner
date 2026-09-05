@@ -1,14 +1,19 @@
 "use client";
 
-/** Admin: majors + courses CRUD. Gated on is_admin (UI gating only — the
- * API enforces authorization and returns 403 for non-admins, which this
- * page surfaces as an error alert rather than crashing). */
+/** Admin (Phase 5): majors + courses CRUD with a distinct elevated-zone
+ * marker. Courses grouped by major; action feedback via toast; the
+ * protected-major rule surfaced as a note, not just a disabled button.
+ * Gated on is_admin (UI gating only — the API enforces authorization and
+ * returns 403 for non-admins, which this page surfaces as an error alert
+ * rather than crashing). */
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ShieldCheck } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { Alert, Badge, Button, Card, Field, Input, Select, Skeleton } from "@/components/ui";
+import { useToast } from "@/components/toast";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
 import { useLang } from "@/lib/lang-context";
@@ -20,15 +25,17 @@ interface PendingDelete {
   name: string;
 }
 
+const PROTECTED_MAJOR_KEY = "computer_science";
+
 export default function AdminPage() {
   const { user, api } = useAuth();
   const { t, lang } = useLang();
+  const { showToast } = useToast();
   const router = useRouter();
 
   const [majors, setMajors] = useState<Major[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // new major form
   const [majorNameFa, setMajorNameFa] = useState("");
@@ -75,7 +82,6 @@ export default function AdminPage() {
   async function createMajor(event: React.FormEvent) {
     event.preventDefault();
     setActionError(null);
-    setActionSuccess(null);
     if (!majorNameFa.trim() || !majorNameEn.trim()) {
       setActionError(t("auth.fill_all_fields"));
       return;
@@ -90,7 +96,7 @@ export default function AdminPage() {
       setMajorNameFa("");
       setMajorNameEn("");
       setMajorKey("");
-      setActionSuccess(t("profile.save_success"));
+      showToast("success", t("profile.save_success"));
       await load();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -102,7 +108,6 @@ export default function AdminPage() {
   async function createCourse(event: React.FormEvent) {
     event.preventDefault();
     setActionError(null);
-    setActionSuccess(null);
     const majorId = Number(courseMajorId);
     if (!courseNameFa.trim() || !courseNameEn.trim() || !Number.isInteger(majorId) || majorId <= 0) {
       setActionError(t("auth.fill_all_fields"));
@@ -119,7 +124,7 @@ export default function AdminPage() {
       setCourseNameFa("");
       setCourseNameEn("");
       setCourseKey("");
-      setActionSuccess(t("profile.save_success"));
+      showToast("success", t("profile.save_success"));
       await load();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -139,7 +144,7 @@ export default function AdminPage() {
         await api.deleteCourse(pendingDelete.id);
       }
       setPendingDelete(null);
-      setActionSuccess(t("profile.save_success"));
+      showToast("success", t("profile.save_success"));
       await load();
     } catch (err) {
       setActionError(errorMessage(err));
@@ -153,18 +158,23 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-bold">{t("admin.title")}</h1>
+      <div>
+        <p className="flex items-center gap-1.5 text-[11px] font-medium text-text-muted">
+          <ShieldCheck size={12} aria-hidden className="text-accent" />
+          {lang === "fa" ? "منطقه مدیریت" : "Admin zone"}
+        </p>
+        <h1 className="mt-0.5 text-xl font-bold text-text-primary">{t("admin.title")}</h1>
+      </div>
 
       {loadError && (
         <Alert tone="error">
           {loadError}{" "}
-          <Button variant="secondary" className="ms-2 px-2 py-1 text-xs" onClick={() => void load()}>
+          <Button variant="secondary" size="sm" className="ms-2" onClick={() => void load()}>
             {t("common.retry")}
           </Button>
         </Alert>
       )}
       {actionError && <Alert tone="error">{actionError}</Alert>}
-      {actionSuccess && <Alert tone="success">{actionSuccess}</Alert>}
 
       {!majors && !loadError && (
         <Card className="space-y-2 p-5">
@@ -175,10 +185,10 @@ export default function AdminPage() {
       )}
 
       {majors && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-6 xl:grid-cols-2">
           <Card className="p-5">
-            <h2 className="mb-3 text-base font-semibold">{t("admin.majors")}</h2>
-            <form onSubmit={createMajor} className="space-y-3">
+            <h2 className="mb-3 text-base font-semibold text-text-primary">{t("admin.majors")}</h2>
+            <form onSubmit={createMajor} className="space-y-3 border-b border-border-subtle pb-5">
               <div className="grid grid-cols-2 gap-3">
                 <Field label={t("admin.name_fa")} htmlFor="major-name-fa">
                   <Input id="major-name-fa" value={majorNameFa} onChange={(event) => setMajorNameFa(event.target.value)} dir="rtl" />
@@ -196,18 +206,19 @@ export default function AdminPage() {
             </form>
             <ul className="mt-4 space-y-2">
               {majors.map((major) => (
-                <li key={major.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
+                <li key={major.id} className="flex items-center justify-between rounded-control border border-border-subtle px-3 py-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{lang === "fa" ? major.name_fa : major.name_en}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400" dir="ltr">
+                    <p className="truncate text-sm font-medium text-text-primary">{lang === "fa" ? major.name_fa : major.name_en}</p>
+                    <p className="text-xs text-text-muted" dir="ltr">
                       {major.key} · {major.courses.length}
                     </p>
                   </div>
                   <Button
                     variant="ghost"
-                    className="px-2 py-1 text-xs text-red-600 dark:text-red-400"
-                    disabled={major.key === "computer_science"}
-                    title={major.key === "computer_science" ? t("admin.protected_major") : undefined}
+                    size="sm"
+                    className="text-danger"
+                    disabled={major.key === PROTECTED_MAJOR_KEY}
+                    title={major.key === PROTECTED_MAJOR_KEY ? t("admin.protected_major") : undefined}
                     onClick={() => setPendingDelete({ type: "major", id: major.id, name: lang === "fa" ? major.name_fa : major.name_en })}
                   >
                     {t("common.delete")}
@@ -215,11 +226,14 @@ export default function AdminPage() {
                 </li>
               ))}
             </ul>
+            {majors.some((major) => major.key === PROTECTED_MAJOR_KEY) && (
+              <p className="mt-3 text-xs text-text-muted">{t("admin.protected_major")}</p>
+            )}
           </Card>
 
           <Card className="p-5">
-            <h2 className="mb-3 text-base font-semibold">{t("admin.courses")}</h2>
-            <form onSubmit={createCourse} className="space-y-3">
+            <h2 className="mb-3 text-base font-semibold text-text-primary">{t("admin.courses")}</h2>
+            <form onSubmit={createCourse} className="space-y-3 border-b border-border-subtle pb-5">
               <Field label={t("admin.major")} htmlFor="course-major">
                 <Select id="course-major" value={courseMajorId} onChange={(event) => setCourseMajorId(event.target.value)}>
                   {majors.map((major) => (
@@ -244,27 +258,37 @@ export default function AdminPage() {
                 + {t("common.create")}
               </Button>
             </form>
-            <ul className="mt-4 space-y-2">
-              {majors.flatMap((major) =>
-                major.courses.map((course) => (
-                  <li key={course.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 dark:border-slate-700">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{lang === "fa" ? course.name_fa : course.name_en}</p>
-                      <p className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400" dir="ltr">
-                        <Badge>{major.key}</Badge> {course.key}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      className="px-2 py-1 text-xs text-red-600 dark:text-red-400"
-                      onClick={() => setPendingDelete({ type: "course", id: course.id, name: lang === "fa" ? course.name_fa : course.name_en })}
-                    >
-                      {t("common.delete")}
-                    </Button>
-                  </li>
-                )),
-              )}
-            </ul>
+            <div className="mt-4 space-y-4">
+              {majors.map((major) => (
+                <div key={major.id}>
+                  <p className="mb-1.5 text-xs font-semibold text-text-secondary">{lang === "fa" ? major.name_fa : major.name_en}</p>
+                  {major.courses.length === 0 ? (
+                    <p className="text-xs text-text-muted">{t("tasks.empty_courses")}</p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {major.courses.map((course) => (
+                        <li key={course.id} className="flex items-center justify-between rounded-control border border-border-subtle px-3 py-1.5">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-text-primary">{lang === "fa" ? course.name_fa : course.name_en}</p>
+                            <p className="text-xs text-text-muted" dir="ltr">
+                              <Badge>{major.key}</Badge> {course.key}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger"
+                            onClick={() => setPendingDelete({ type: "course", id: course.id, name: lang === "fa" ? course.name_fa : course.name_en })}
+                          >
+                            {t("common.delete")}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
           </Card>
         </div>
       )}

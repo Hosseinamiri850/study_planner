@@ -1,19 +1,23 @@
 "use client";
 
-/** Student dashboard: stat cards, weekly chart, course progress, and the
- * task list with session start/stop. Live timer ticks locally for the
- * open session; the backend remains the source of truth for totals. */
+/** Student dashboard, Phase 4: asymmetric two-zone layout (03 §3). Start
+ * zone = running session + task list (workspace); end zone = stat strip,
+ * weekly chart, course progress (context). All session/timer logic is
+ * carried verbatim from the pre-redesign page — only presentation moved.
+ * Live timer ticks locally for the open session; the backend remains the
+ * source of truth for totals. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { StatsCards, WeeklyChart } from "@/components/stats-cards";
+import { CourseProgressList } from "@/components/course-progress-list";
+import { RunningSessionBar } from "@/components/running-session-bar";
+import { StatsStrip, WeeklyChart } from "@/components/stats-cards";
 import { TaskFormDialog } from "@/components/task-form-dialog";
 import { TaskItem } from "@/components/tasks-panel";
 import { Alert, Button, Card, EmptyState, Skeleton } from "@/components/ui";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
-import { formatHours } from "@/lib/format";
 import { useLang } from "@/lib/lang-context";
 import type { Course, DashboardStats, Task, TaskListPaginatedResponse } from "@/types/api";
 
@@ -36,6 +40,7 @@ export default function DashboardPage() {
   const [runningSince, setRunningSince] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [stopping, setStopping] = useState(false);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -143,6 +148,7 @@ export default function DashboardPage() {
   }
 
   async function stopSession(task: Task, sessionId: number) {
+    setStopping(true);
     setActionError(null);
     try {
       await api.stopSession(task.id, sessionId);
@@ -153,6 +159,8 @@ export default function DashboardPage() {
       void loadTasks(page);
     } catch (err) {
       setActionError(errorMessage(err));
+    } finally {
+      setStopping(false);
     }
   }
 
@@ -194,27 +202,30 @@ export default function DashboardPage() {
     [loadStats],
   );
 
-  const greeting = t("dashboard.greeting", { name: user?.fullname ?? user?.username ?? "" });
+  const runningTask = tasks?.find((task) => task.id === runningTaskId) ?? null;
+  const isNewUser = stats !== null && stats.total_tasks === 0;
+
+  const openTaskForm = (task: Task | null) => {
+    setEditingTask(task);
+    setFormOpen(true);
+  };
+
+  const suggestedCourse = courses?.[0] ?? null;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold">{greeting}</h1>
-        <div className="flex items-center gap-3">
-          {runningTaskId !== null && runningSince !== null && (
-            <Alert tone="info">
-              {t("tasks.session_running")} · {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")}
-            </Alert>
-          )}
-          <Button
-            onClick={() => {
-              setEditingTask(null);
-              setFormOpen(true);
-            }}
-          >
-            + {t("tasks.new_task")}
-          </Button>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="tracking-label text-[11px] font-medium text-text-muted">
+            {lang === "fa" ? "داشبورد" : "Dashboard"}
+          </p>
+          <h1 className="mt-0.5 text-xl font-bold text-text-primary">
+            {t("dashboard.greeting", { name: user?.fullname ?? user?.username ?? "" })}
+          </h1>
         </div>
+        <Button onClick={() => openTaskForm(null)}>
+          + {t("tasks.new_task")}
+        </Button>
       </div>
 
       {actionError && <Alert tone="error">{actionError}</Alert>}
@@ -222,146 +233,143 @@ export default function DashboardPage() {
       {statsError && (
         <Alert tone="error">
           {statsError}{" "}
-          <Button variant="secondary" className="ms-2 px-2 py-1 text-xs" onClick={() => void loadStats()}>
+          <Button variant="secondary" size="sm" className="ms-2" onClick={() => void loadStats()}>
             {t("common.retry")}
           </Button>
         </Alert>
       )}
-      {!stats && !statsError && (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <Card key={index} className="p-4">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="mt-2 h-7 w-16" />
-            </Card>
-          ))}
-        </div>
-      )}
-      {stats && (
-        <>
-          <StatsCards
-            todayHours={stats.today_hours}
-            totalWeekHours={stats.total_week_hours}
-            totalMonthHours={stats.total_month_hours}
-            totalDone={stats.total_done}
-            totalTasks={stats.total_tasks}
-            lang={lang}
-            labels={{
-              today: t("stats.today_hours"),
-              week: t("stats.total_week_hours"),
-              month: t("stats.total_month_hours"),
-              done: t("stats.done_tasks"),
-              hoursUnit: t("stats.hours_unit"),
-            }}
-          />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="p-4">
-              <WeeklyChart weekHours={stats.week_hours} lang={lang} label={t("stats.weekly")} />
-            </Card>
-            <Card className="p-4">
-              <h2 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">{t("stats.course_stats")}</h2>
-              {Object.keys(stats.courses).length === 0 ? (
-                <p className="text-sm text-slate-500 dark:text-slate-400">{t("tasks.empty_courses")}</p>
-              ) : (
-                <ul className="space-y-2">
-                  {Object.entries(stats.courses).map(([key, course]) => (
-                    <li key={key}>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-medium">{course.name}</span>
-                        <span className="text-slate-500 dark:text-slate-400">
-                          {course.done}/{course.total} · {formatHours(course.hours, lang)} {t("stats.hours_unit")}
-                        </span>
-                      </div>
-                      <div className="mt-1 h-1.5 w-full rounded bg-slate-200 dark:bg-slate-700">
-                        <div
-                          className="h-1.5 rounded bg-indigo-600 dark:bg-indigo-400"
-                          style={{ width: `${course.total > 0 ? Math.round((course.done / course.total) * 100) : 0}%` }}
-                        />
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </div>
-        </>
+
+      {/* Running session — the hero zone (start/workspace top) */}
+      {runningTaskId !== null && runningSince !== null && (
+        <RunningSessionBar
+          taskTitle={runningTask?.title ?? null}
+          courseLabel={runningTask?.course_key ?? null}
+          elapsedSeconds={elapsed}
+          stopping={stopping}
+          onStop={() => {
+            if (runningTask && runningSessionId !== null) void stopSession(runningTask, runningSessionId);
+          }}
+        />
       )}
 
-      <section aria-label={t("tasks.title")} className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{t("tasks.title")}</h2>
-          {tasks && (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {total.toLocaleString(lang === "fa" ? "fa-IR" : "en-US")}
-            </span>
+      {/* Asymmetric two-zone grid (03 §3): workspace / context. */}
+      <div className="grid gap-8 lg:grid-cols-12">
+        {/* Workspace zone */}
+        <div className="space-y-4 lg:col-span-8">
+          <section aria-label={t("tasks.title")} className="space-y-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-lg font-semibold text-text-primary">{t("tasks.title")}</h2>
+              {tasks && (
+                <span className="text-sm tabular-nums text-text-muted">
+                  {total.toLocaleString(lang === "fa" ? "fa-IR" : "en-US")}
+                </span>
+              )}
+            </div>
+            {tasksError && (
+              <Alert tone="error">
+                {tasksError}{" "}
+                <Button variant="secondary" size="sm" className="ms-2" onClick={() => void loadTasks(page)}>
+                  {t("common.retry")}
+                </Button>
+              </Alert>
+            )}
+            {!tasks && !tasksError && (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Card key={index} className="p-3">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="mt-2 h-3 w-1/3" />
+                  </Card>
+                ))}
+              </div>
+            )}
+            {tasks && tasks.length === 0 && (
+              <EmptyState
+                title={t("tasks.empty_title")}
+                description={
+                  suggestedCourse
+                    ? `${t("tasks.empty_description")} ${t("tasks.suggested_course")}: ${lang === "fa" ? suggestedCourse.name_fa : suggestedCourse.name_en}`
+                    : t("tasks.empty_description")
+                }
+                action={
+                  <Button onClick={() => openTaskForm(null)}>
+                    + {t("tasks.new_task")}
+                  </Button>
+                }
+              />
+            )}
+            {tasks && tasks.length > 0 && (
+              <ul className="space-y-2">
+                {tasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    runningTaskId={runningTaskId}
+                    runningSessionId={runningSessionId}
+                    onToggle={(target) => void toggleTask(target)}
+                    onDelete={(target) => setDeletingTask(target)}
+                    onEdit={openTaskForm}
+                    onStart={startSession}
+                    onStop={stopSession}
+                  />
+                ))}
+              </ul>
+            )}
+            {tasks && pages > 1 && (
+              <nav className="flex items-center justify-center gap-3" aria-label={t("a11y.pagination")}>
+                <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => void loadTasks(page - 1)}>
+                  {t("tasks.prev_page")}
+                </Button>
+                <span className="text-xs text-text-muted">{t("tasks.page_of", { page, pages })}</span>
+                <Button variant="secondary" size="sm" disabled={page >= pages} onClick={() => void loadTasks(page + 1)}>
+                  {t("tasks.next_page")}
+                </Button>
+              </nav>
+            )}
+          </section>
+        </div>
+
+        {/* Context zone */}
+        <div className="space-y-8 lg:col-span-4">
+          {!stats && !statsError && (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+              ))}
+            </div>
+          )}
+          {stats && (
+            <>
+              <StatsStrip
+                todayHours={stats.today_hours}
+                totalWeekHours={stats.total_week_hours}
+                totalMonthHours={stats.total_month_hours}
+                totalDone={stats.total_done}
+                totalTasks={stats.total_tasks}
+              />
+              <div className="border-t border-border-subtle pt-6">
+                <WeeklyChart weekHours={stats.week_hours} label={t("stats.weekly")} />
+              </div>
+              <div className="border-t border-border-subtle pt-6">
+                <h2 className="mb-3 text-sm font-semibold text-text-primary">{t("stats.course_stats")}</h2>
+                {isNewUser ? (
+                  <p className="text-sm text-text-muted">{t("dashboard.empty_courses_hint")}</p>
+                ) : (
+                  <CourseProgressList
+                    courses={Object.entries(stats.courses).map(([key, course]) => ({
+                      key,
+                      name: course.name,
+                      total: course.total,
+                      done: course.done,
+                      hours: course.hours,
+                    }))}
+                  />
+                )}
+              </div>
+            </>
           )}
         </div>
-        {tasksError && (
-          <Alert tone="error">
-            {tasksError}{" "}
-            <Button variant="secondary" className="ms-2 px-2 py-1 text-xs" onClick={() => void loadTasks(page)}>
-              {t("common.retry")}
-            </Button>
-          </Alert>
-        )}
-        {!tasks && !tasksError && (
-          <div className="space-y-2">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <Card key={index} className="p-3">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="mt-2 h-3 w-1/3" />
-              </Card>
-            ))}
-          </div>
-        )}
-        {tasks && tasks.length === 0 && (
-          <EmptyState
-            title={t("tasks.empty_title")}
-            description={t("tasks.empty_description")}
-            action={
-              <Button
-                onClick={() => {
-                  setEditingTask(null);
-                  setFormOpen(true);
-                }}
-              >
-                + {t("tasks.new_task")}
-              </Button>
-            }
-          />
-        )}
-        {tasks && tasks.length > 0 && (
-          <ul className="space-y-2">
-            {tasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                runningTaskId={runningTaskId}
-                runningSessionId={runningSessionId}
-                onToggle={(target) => void toggleTask(target)}
-                onDelete={(target) => setDeletingTask(target)}
-                onEdit={(target) => {
-                  setEditingTask(target);
-                  setFormOpen(true);
-                }}
-                onStart={startSession}
-                onStop={stopSession}
-              />
-            ))}
-          </ul>
-        )}
-        {tasks && pages > 1 && (
-          <nav className="flex items-center justify-center gap-3" aria-label={t("a11y.pagination")}>
-            <Button variant="secondary" className="px-3 py-1 text-xs" disabled={page <= 1} onClick={() => void loadTasks(page - 1)}>
-              {t("tasks.prev_page")}
-            </Button>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{t("tasks.page_of", { page, pages })}</span>
-            <Button variant="secondary" className="px-3 py-1 text-xs" disabled={page >= pages} onClick={() => void loadTasks(page + 1)}>
-              {t("tasks.next_page")}
-            </Button>
-          </nav>
-        )}
-      </section>
+      </div>
 
       {formOpen && courses && (
         <TaskFormDialog

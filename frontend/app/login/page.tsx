@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { Logomark } from "@/components/logomark";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
 import { useLang } from "@/lib/lang-context";
@@ -73,9 +74,9 @@ function LoginForm() {
           {t("auth.login_btn")}
         </Button>
       </form>
-      <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-4 text-center text-sm text-text-muted">
         {t("auth.no_account")}{" "}
-        <Link href="/register" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/register" className="font-medium text-accent hover:underline">
           {t("auth.register_link")}
         </Link>
       </p>
@@ -84,8 +85,17 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const { t } = useLang();
+
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+      {/* Brand moment: the first touch of the product (06 §2). */}
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="text-accent">
+          <Logomark size={40} />
+        </span>
+        <p className="text-lg font-bold text-text-primary">{t("app_name")}</p>
+      </div>
       <Suspense fallback={null}>
         <LoginForm />
       </Suspense>

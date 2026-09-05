@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { Logomark } from "@/components/logomark";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
 import { useLang } from "@/lib/lang-context";
@@ -52,7 +53,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="text-accent">
+          <Logomark size={40} />
+        </span>
+        <p className="text-lg font-bold text-text-primary">{t("app_name")}</p>
+      </div>
       <Card className="w-full max-w-sm p-6">
         <h1 className="mb-4 text-center text-lg font-bold">{t("auth.register_title")}</h1>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -90,9 +97,9 @@ export default function RegisterPage() {
             {t("auth.register_btn")}
           </Button>
         </form>
-        <p className="mt-4 text-center text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-4 text-center text-sm text-text-muted">
           {t("auth.have_account")}{" "}
-          <Link href="/login" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+          <Link href="/login" className="font-medium text-accent hover:underline">
             {t("auth.login_link")}
           </Link>
         </p>
