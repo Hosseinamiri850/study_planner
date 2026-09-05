@@ -8,6 +8,7 @@ from app.integrations.translator import is_available as translator_available
 from app.models import StudySession
 from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
 from app.repositories.refresh_token_repo import RefreshTokenRepo
+from app.services.audit import record as audit_record
 from app.services.statistics import all_courses_list, course_stats, get_user_stats
 from app.utils.auth import (
     api_admin_required,
@@ -66,6 +67,17 @@ def _resolve_course(data, existing=None):
     if course_id is not None:
         return CourseRepo.get(course_id)
     return CourseRepo.find_by_key(course_key)
+
+
+def _task_snapshot(task):
+    """Compact JSON snapshot of a task for the audit before/after columns."""
+    return {
+        "title": task.title,
+        "course_key": task.course_key,
+        "priority": task.priority,
+        "status": task.status,
+        "estimated_hours": task.estimated_hours,
+    }
 
 
 @api_bp.route("/auth/register", methods=["POST"])
@@ -236,6 +248,7 @@ def create_course_api():
     if CourseRepo.find_by_key_major(key, major.id):
         return _error("A course with this key already exists for the major.", 409)
     course = CourseRepo.create(key=key, name_fa=name_fa, name_en=name_en, major_id=major.id)
+    audit_record(g.api_user, "course.create", ("course", course.id), after=_course_payload(course))
     return jsonify({"course": _course_payload(course)}), 201
 
 
@@ -246,6 +259,7 @@ def update_course_api(course_id):
     course = CourseRepo.get_for_write(course_id)
     if course is None:
         return _error("Course not found.", 404)
+    before = _course_payload(course)
     data = request.get_json(silent=True) or {}
     if "name_fa" in data:
         name_fa = str(data["name_fa"]).strip()
@@ -258,6 +272,7 @@ def update_course_api(course_id):
             return _error("name_en must not be empty.")
         course.name_en = name_en
     CourseRepo.commit()
+    audit_record(g.api_user, "course.update", ("course", course_id), before=before, after=_course_payload(course))
     return jsonify({"course": _course_payload(course)})
 
 
@@ -267,7 +282,9 @@ def update_course_api(course_id):
 def delete_course_api(course_id):
     """Archive-style delete: task rows survive with their legacy course_key
     (CourseRepo.delete_preserve_tasks). Matches the dashboard delete flow."""
+    course = CourseRepo.get(course_id)
     if CourseRepo.delete_preserve_tasks(course_id):
+        audit_record(g.api_user, "course.delete", ("course", course_id), before=_course_payload(course))
         return "", 204
     return _error("Course not found.", 404)
 
@@ -287,6 +304,7 @@ def create_major_api():
     if MajorRepo.find_by_key(key):
         return _error("A major with this key already exists.", 409)
     major = MajorRepo.create(key=key, name_fa=name_fa, name_en=name_en)
+    audit_record(g.api_user, "major.create", ("major", major.id), after=_major_payload(major))
     return jsonify({"major": _major_payload(major)}), 201
 
 
@@ -297,6 +315,7 @@ def update_major_api(major_id):
     major = MajorRepo.get_for_write(major_id)
     if major is None:
         return _error("Major not found.", 404)
+    before = _major_payload(major)
     data = request.get_json(silent=True) or {}
     if "name_fa" in data:
         name_fa = str(data["name_fa"]).strip()
@@ -309,6 +328,7 @@ def update_major_api(major_id):
             return _error("name_en must not be empty.")
         major.name_en = name_en
     MajorRepo.commit()
+    audit_record(g.api_user, "major.update", ("major", major_id), before=before, after=_major_payload(major))
     return jsonify({"major": _major_payload(major)})
 
 
@@ -323,7 +343,9 @@ def delete_major_api(major_id):
         return _error("Major not found.", 404)
     if major.key == "computer_science":
         return _error("The default major cannot be deleted.", 409)
+    before = _major_payload(major)
     if MajorRepo.delete(major_id):
+        audit_record(g.api_user, "major.delete", ("major", major_id), before=before)
         return "", 204
     return _error("Major not found.", 404)
 
@@ -386,6 +408,7 @@ def create_task():
         priority=priority,
         hours=hours,
     )
+    audit_record(g.api_user, "task.create", ("task", task.id), after=_task_snapshot(task))
     return jsonify({"task": _task_payload(task)}), 201
 
 
@@ -396,6 +419,7 @@ def update_task(task_id):
     task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
+    before = _task_snapshot(task)
     data = request.get_json(silent=True) or {}
     course = _resolve_course(data, task)
     if ("course_id" in data or "course_key" in data) and not course:
@@ -431,6 +455,7 @@ def update_task(task_id):
             return _error("status must be pending or completed.")
     TaskRepo.update_fields(task, **fields)
     TaskRepo.commit()
+    audit_record(g.api_user, "task.update", ("task", task.id), before=before, after=_task_snapshot(task))
     return jsonify({"task": _task_payload(task)})
 
 
@@ -441,7 +466,9 @@ def delete_task(task_id):
     task = TaskRepo.get_for_write(task_id)
     if not task or task.user_id != g.api_user.id:
         return _error("Task not found.", 404)
+    before = _task_snapshot(task)
     TaskRepo.delete(task)
+    audit_record(g.api_user, "task.delete", ("task", task_id), before=before)
     return "", 204
 
 
