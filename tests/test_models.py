@@ -4,8 +4,9 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Course, Major
+from app.models import Course, Major, User
 from app.models.task import _utcnow
+from app.models.user import VALID_ROLES
 from app.services.seed import seed_reference_data
 from app.services.statistics import all_courses_list, course_stats, get_user_stats, majors_for_template
 
@@ -45,6 +46,57 @@ class TestUserModel:
         assert user.tasks.count() == 2
         assert task1.user == user
         assert task2.user == user
+
+
+class TestUserRole:
+    """Multi-tenancy foundations (TASK-037): role column + is_admin shim."""
+
+    def test_default_role_is_student(self, create_user):
+        user = create_user(username="plainuser")
+        assert user.role == "student"
+
+    def test_is_admin_kwarg_maps_to_role(self, create_user):
+        admin = create_user(username="kwargadmin", is_admin=True)
+        assert admin.role == "site_admin"
+        assert admin.is_admin is True
+
+    def test_is_admin_property_reads_role(self, create_user):
+        user = create_user(username="propcheck")
+        user.role = "site_admin"
+        assert user.is_admin is True
+        user.role = "teacher"
+        assert user.is_admin is False
+
+    def test_is_admin_setter_writes_role(self, create_user):
+        user = create_user(username="settercheck")
+        user.is_admin = True
+        assert user.role == "site_admin"
+        user.is_admin = False
+        assert user.role == "student"
+
+    def test_non_site_admin_roles_not_admin(self, create_user):
+        for role in ("teacher", "school_admin", "support", "student"):
+            user = create_user(username=f"role_{role}")
+            user.role = role
+            assert user.is_admin is False, role
+
+    def test_institution_id_nullable_and_storable(self, create_user):
+        user = create_user(username="institutionless")
+        assert user.institution_id is None
+        user.institution_id = 42
+        db.session.commit()
+        reloaded = db.session.get(User, user.id)
+        assert reloaded.institution_id == 42
+
+    def test_valid_roles_constant_covers_all(self):
+        assert VALID_ROLES == ("student", "teacher", "school_admin", "site_admin", "support")
+
+    def test_direct_constructor_kwarg(self, app):
+        user = User(username="ctoruser", password="x", fullname="C", is_admin=True)
+        assert user.role == "site_admin"
+        db.session.add(user)
+        db.session.commit()
+        assert db.session.get(User, user.id).role == "site_admin"
 
 
 class TestMajorModel:
