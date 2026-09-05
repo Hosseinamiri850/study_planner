@@ -12,6 +12,11 @@ Structure is fixed now; values land after direction is approved. Frontend implem
 |------|-------|------|-------|
 | Body FA | `--font-sans` | **Vazirmatn variable (100–900), self-hosted OFL** | covers fa + latin |
 | Display/numerals | `--font-display` | **Space Grotesk variable (300–700), self-hosted OFL** | stat values, timer, dates |
+
+**Per-glyph fallback rule:** Space Grotesk has no Arabic-script coverage, so
+`--font-display` falls through per glyph to Vazirmatn — Latin renders in Space
+Grotesk, Persian digits/words render in Vazirmatn. Never let the display stack
+end without a Persian-capable face before the generic `sans-serif`.
 | Code/keys | `--font-mono` | Space Grotesk (same face) | course keys |
 
 Scale (draft): `12 / 13 / 14 / 16 / 18 / 22 / 28 / 36 / 48`. Timer + stat values get `tabular-nums`. Line-height: 1.5 body, 1.1 display. Weights: 400/500/600/700 only.

@@ -6,11 +6,12 @@ and is now out of date — see `.ai/STRUCTURE.md` for why.
 
 ## What this project is
 
-Study Planner — a Flask + PostgreSQL web app that helps students track courses,
-tasks, and study hours, with full Persian (RTL) / English (LTR) i18n. Server-rendered
-Bootstrap frontend today; a JSON REST API exists under `/api/*` to support a future
-SPA or mobile client. See `README.md` for the product feature list and `.ai/STRUCTURE.md`
-for the technical architecture.
+Study Planner — a Flask + PostgreSQL backend with a Next.js 15 (App Router) +
+TypeScript + Tailwind v4 SPA as the primary client, plus a legacy server-rendered
+Jinja/Bootstrap UI still in `templates/`. A JSON REST API under `/api/*` backs both
+and is the contract for any future mobile client. See `README.md` for the product
+feature list, `.ai/STRUCTURE.md` for the technical architecture, and
+`docs/redesign/` for the frontend design system (the source of truth for UI work).
 
 Current stage: **past the P0 foundation refactor, not yet production-hardened.**
 Read `.ai/TODO.md` before starting any task — it's the live backlog, ordered by priority.
@@ -34,10 +35,56 @@ app/
 migrations/       Alembic. Two revisions so far: 20260723_01 (initial), 20260723_02
                    (Task.status/estimated_hours/course_id + StudySession table).
 tests/            pytest, in-memory SQLite. Good fixture coverage in conftest.py.
-                   191 tests covering models/, services/, utils/, integrations/,
+                   306 tests covering models/, services/, utils/, integrations/,
                    api.py, web.py, admin.py, CLI commands, rate limiting,
-                   refresh-token rotation, and Sentry init.
+                   caching, repositories, refresh-token rotation, and Sentry init.
+templates/        Legacy Jinja/Bootstrap UI — still functional, being phased out
+                   by the Next.js SPA. Don't add new features here.
 ```
+
+### Frontend (Next.js SPA — the primary client)
+
+```
+frontend/         Next.js 15 (App Router) + TypeScript + Tailwind v4 + shadcn-style
+                  Radix primitives. Design system: docs/redesign/ (read before UI work).
+  app/            Routes: / (redirect), /login, /register, /app (dashboard),
+                  /app/profile, /app/admin, /app/forbidden, not-found.
+                  API route handlers under app/api/* own the httpOnly refresh cookie.
+  components/     ui.tsx (token-skinned primitives), app-shell, user-menu,
+                  lang-switch, logomark, running-session-bar, course-progress-list,
+                  stats-cards (StatsStrip + recharts), tasks-panel, toast,
+                  confirm-dialog + task-form-dialog (Radix Dialog/AlertDialog).
+  lib/            api.ts (typed client mirroring the Flask contract), auth-context
+                  (in-memory access token + silent refresh), theme/lang contexts,
+                  format.ts, validation.ts, errors.ts. i18n loads locales/*.json
+                  synced from the backend's canonical files by scripts/sync-locales.mjs
+                  (predev/prebuild) — never edit frontend/locales directly.
+  public/fonts/   Self-hosted OFL: Vazirmatn variable (fa+latin body), Space Grotesk
+                  variable (display/numerals). Licenses included.
+```
+
+Frontend rules (docs/redesign/04-design-system.md is authoritative):
+
+- **Design tokens, not raw colors.** Surfaces/text/accent/status come from the
+  semantic tokens in `frontend/app/globals.css` (`bg-surface-1`, `text-text-primary`,
+  `border-border-subtle`, `rounded-control`, ...). Never hardcode slate/indigo/etc.
+- **RTL safety is lint-enforced (error).** Physical horizontal Tailwind properties
+  (`pl-/pr-/ml-/mr-/left-/right-/text-left/text-right`) are banned in app code —
+  use logical properties (`ps-/pe-/ms-/me-/start-/end-/text-start/text-end`).
+  Persian text never gets letter-spacing (use the `tracking-label` guard class).
+- **Radix for behavior, tokens for skin.** Dialogs/menus use Radix (Dialog,
+  AlertDialog, DropdownMenu) — never hand-rolled portals. All visual classes come
+  from the token layer; don't reintroduce default shadcn styling.
+- **Persian-first typography.** Vazirmatn for body, Space Grotesk `.font-display`
+  with `tnum` for stat values and the live timer. Don't swap the font stack.
+- Auth model (do not change): access token in memory only (React state, 15-min TTL);
+  refresh token is an httpOnly cookie owned by the Next route handlers under
+  `app/api/auth/*` — JavaScript never touches it. `middleware.ts` route-gating is
+  UX routing, not a security boundary.
+- Dev workflow: `npm run dev --prefix frontend` (proxies `/api/*` to Flask on
+  127.0.0.1:5000 via the `/api/proxy/*` catch-all). **Never run `next build` while
+  the dev server is up on Windows** — it corrupts the shared `.next` dir (ENOENT
+  on `_buildManifest.js.tmp.*`); stop the dev server, build, restart.
 
 Two parallel auth systems exist by design and must both keep working:
 - **Browser**: Flask session cookie (`session["username"]`), CSRF-protected forms
@@ -73,11 +120,15 @@ Two parallel auth systems exist by design and must both keep working:
   with a matching test in `tests/test_routes_api.py`. Don't let the browser routes
   and the API drift into different feature sets without a reason.
 - i18n: user-facing strings go in `locales/fa.json` / `locales/en.json` via `t("key.path")`,
-  never hardcoded in templates or Python. Keep both files' keys in sync.
-- Run `pytest` before considering any change done. Current suite: 94 tests, all
-  passing, but it only covers `models/`, `services/`, `utils/`, and `api.py` —
-  **`web.py` and `admin.py` (the actual browser UI, i.e. 100% of real users today)
-  have zero test coverage.** Adding tests there is high-value, low-risk work.
+  never hardcoded in templates, Python, or the SPA. Keep both files' keys in sync
+  (frontend reads them via `frontend/lib/i18n` — run `npm run predev --prefix frontend`
+  to re-sync after editing the canonical files).
+- Run `pytest` before considering any backend change done (306 tests, all passing).
+  For frontend changes, run `npm run typecheck --prefix frontend`,
+  `npm run lint --prefix frontend`, and `next build` (with the dev server stopped) —
+  and visually verify in the browser; see `docs/redesign/08-visual-qa.md` for the
+  standard regression flows (register/login, task CRUD, session start/stop/reload
+  restore, fa⇄EN dir flip, dark/light, mobile 375px).
 
 ## Known issues to keep in mind (see .ai/TODO.md for the prioritized version)
 
@@ -94,8 +145,11 @@ Two parallel auth systems exist by design and must both keep working:
 - Don't migrate off Flask or PostgreSQL.
 - Don't reintroduce automatic table creation on app startup.
 - Don't rewrite the whole app "while you're in there" — scope changes to the task.
-- Don't add a frontend framework/SPA rewrite unprompted; the backend is being
-  prepared for one, but the server-rendered UI is still the product today.
+- Don't add new features to the legacy Jinja templates (`templates/`) — the
+  Next.js SPA is the product client now; anything user-facing goes through the
+  API + SPA.
+- Don't bypass or restyle over the design tokens / Radix primitives (no raw
+  hex colors, no hand-rolled dialogs, no physical positioning properties).
 
 ## graphify
 
