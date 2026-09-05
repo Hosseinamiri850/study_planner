@@ -6,8 +6,9 @@ from werkzeug.security import generate_password_hash
 from app.repositories import CourseRepo, MajorRepo, TaskRepo, UserRepo
 from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.routes.web import _create_course, _create_major
+from app.services.audit import record as audit_record
 from app.services.statistics import hours_map_by_day, majors_for_template
-from app.utils.auth import admin_required
+from app.utils.auth import admin_required, current_user
 from app.utils.validation import valid_password
 
 admin_bp = Blueprint("admin", __name__)
@@ -54,9 +55,12 @@ def admin_panel():
 
 def _handle_admin_action():
     action = request.form.get("action")
+    actor = current_user()
     if action == "delete_user":
         user = UserRepo.find_by_username(request.form.get("username"))
-        if user and not user.is_admin: UserRepo.delete(user.id)
+        if user and not user.is_admin:
+            UserRepo.delete(user.id)
+            audit_record(actor, "user.delete", ("user", user.id), before={"username": user.username})
     elif action == "change_password":
         user, password = UserRepo.find_by_username(request.form.get("username")), request.form.get("new_password", "").strip()
         if user and valid_password(password):
@@ -64,14 +68,25 @@ def _handle_admin_action():
             # Invalidate any outstanding API refresh tokens: the password
             # changed, so any prior session is no longer trustworthy.
             RefreshTokenRepo.revoke_all_for_user(user.id)
-    elif action == "add_major": _create_major(request.form)
+            UserRepo.commit()
+            # No before/after snapshot: the password hash must never land in
+            # the audit trail, only the fact that it changed.
+            audit_record(actor, "user.password_change", ("user", user.id))
+    elif action == "add_major":
+        _create_major(request.form)
     elif action == "delete_major":
         major_id = request.form.get("major_id", type=int)
         major = MajorRepo.get(major_id)
-        if major and major.key != "computer_science": MajorRepo.delete(major_id)
-    elif action == "add_course": _create_course(request.form)
+        if major and major.key != "computer_science":
+            before = {"key": major.key, "name_fa": major.name_fa, "name_en": major.name_en}
+            MajorRepo.delete(major_id)
+            audit_record(actor, "major.delete", ("major", major_id), before=before)
+    elif action == "add_course":
+        _create_course(request.form)
     elif action == "delete_course":
         course_id = request.form.get("course_id", type=int)
         course = CourseRepo.get(course_id)
         if course:
+            before = {"key": course.key, "name_fa": course.name_fa, "name_en": course.name_en, "major_id": course.major_id}
             CourseRepo.delete_preserve_tasks(course_id)
+            audit_record(actor, "course.delete", ("course", course_id), before=before)
