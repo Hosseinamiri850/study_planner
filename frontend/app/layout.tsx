@@ -18,6 +18,13 @@ const spaceGrotesk = localFont({
   style: "normal",
   display: "swap",
   variable: "--font-space-grotesk",
+  // Space Grotesk has no Arabic-script glyphs. Next's automatic metric
+  // fallback ("spaceGrotesk Fallback") resolves to a system font WITH
+  // Arabic coverage (e.g. Segoe UI on Windows), which intercepts Persian
+  // digits/words before our Vazirmatn fallback can serve them. Disabling
+  // the auto fallback lets the per-glyph fallback chain in globals.css
+  // (--font-display) reach Vazirmatn directly.
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {
