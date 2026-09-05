@@ -1,9 +1,11 @@
 "use client";
 
-/** One task row: status, course badge, priority, estimated hours,
- * session start/stop, edit, delete. Sessions expand inline. */
+/** One task row (Phase 4 anatomy): completion check, title, meta line,
+ * priority edge mark (audit B3 — weight + rail, not pill-spam), session
+ * start/stop, icon actions. Sessions expand inline. */
 
 import { useEffect, useState } from "react";
+import { Check, Pencil, Play, Square, Timer, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { formatDateTime, formatDuration } from "@/lib/format";
@@ -11,7 +13,17 @@ import { useLang } from "@/lib/lang-context";
 import type { StudySession, Task } from "@/types/api";
 import { Badge, Button, Spinner } from "./ui";
 
-const priorityTone = { low: "default", medium: "warning", high: "danger" } as const;
+const priorityRail: Record<Task["priority"], string> = {
+  low: "bg-transparent",
+  medium: "bg-warning",
+  high: "bg-danger",
+};
+
+const priorityWeight: Record<Task["priority"], string> = {
+  low: "font-normal",
+  medium: "font-medium",
+  high: "font-semibold",
+};
 
 interface TaskItemProps {
   task: Task;
@@ -64,82 +76,117 @@ export function TaskItem({ task, runningTaskId, runningSessionId, onToggle, onDe
     }
   }
 
+  const iconAction =
+    "flex h-8 w-8 items-center justify-center rounded-control text-text-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50";
+
   return (
-    <li className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
-      <div className="flex flex-wrap items-center gap-2">
+    <li
+      className={`group relative rounded-surface border border-border-subtle bg-surface-1 ps-4 pe-3 py-3 transition-colors duration-150 ${
+        running ? "border-accent/40 bg-accent/5" : ""
+      }`}
+    >
+      {/* priority edge mark */}
+      <span
+        aria-hidden
+        className={`absolute inset-y-3 start-0 w-1 rounded-pill ${priorityRail[task.priority]}`}
+      />
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           type="button"
           onClick={() => onToggle(task)}
           disabled={busy}
           aria-pressed={done}
           aria-label={done ? t("tasks.mark_pending") : t("tasks.mark_done")}
-          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
+          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-pill border-2 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
             done
-              ? "border-emerald-600 bg-emerald-600 text-white"
-              : "border-slate-300 text-transparent hover:border-emerald-500 dark:border-slate-600"
+              ? "border-success bg-success text-white"
+              : "border-border-strong text-transparent hover:border-success"
           }`}
         >
-          ✓
+          <Check size={14} strokeWidth={3} aria-hidden />
         </button>
         <div className="min-w-0 flex-1">
-          <p className={`truncate text-sm font-medium ${done ? "text-slate-400 line-through dark:text-slate-500" : ""}`}>
+          <p className={`truncate text-sm ${priorityWeight[task.priority]} ${done ? "text-text-muted line-through" : "text-text-primary"}`}>
             {task.title}
           </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-            <Badge tone={priorityTone[task.priority]}>{t(`tasks.priority_${task.priority}`)}</Badge>
-            <span className="truncate">{task.course_key}</span>
-            <span>· {task.estimated_hours}h</span>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-text-muted">
+            <span className="truncate" dir="auto">{task.course_key}</span>
+            <span aria-hidden>·</span>
+            <span className="tabular-nums">{task.estimated_hours}h</span>
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {running && (
             <Badge tone="success">
-              <span className="me-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" aria-hidden />
+              <span className="me-1 inline-block h-1.5 w-1.5 animate-pulse rounded-pill bg-success motion-reduce:animate-none" aria-hidden />
               {t("tasks.session_running")}
             </Badge>
           )}
           {!done && !running && (
             <Button
               variant="secondary"
-              className="px-2 py-1 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void withBusy(() => onStart(task))}
+              aria-label={t("tasks.start_session")}
             >
-              {t("tasks.start_session")}
+              <Play size={14} aria-hidden />
+              <span className="hidden sm:inline">{t("tasks.start_session")}</span>
             </Button>
           )}
           {running && (
             <Button
               variant="primary"
-              className="px-2 py-1 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => runningSessionId !== null && void withBusy(() => onStop(task, runningSessionId))}
+              aria-label={t("tasks.stop_session")}
             >
-              {t("tasks.stop_session")}
+              <Square size={14} aria-hidden />
+              <span className="hidden sm:inline">{t("tasks.stop_session")}</span>
             </Button>
           )}
-          <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => setShowSessions((open) => !open)} aria-expanded={showSessions}>
-            {t("tasks.sessions")}
-          </Button>
-          <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => onEdit(task)}>
-            {t("common.edit")}
-          </Button>
-          <Button variant="ghost" className="px-2 py-1 text-xs text-red-600 dark:text-red-400" onClick={() => onDelete(task)}>
-            {t("common.delete")}
-          </Button>
+          <button
+            type="button"
+            onClick={() => setShowSessions((open) => !open)}
+            aria-expanded={showSessions}
+            aria-label={t("tasks.sessions")}
+            disabled={busy}
+            className={iconAction}
+          >
+            <Timer size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(task)}
+            aria-label={t("common.edit")}
+            disabled={busy}
+            className={iconAction}
+          >
+            <Pencil size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(task)}
+            aria-label={t("common.delete")}
+            disabled={busy}
+            className={`${iconAction} hover:text-danger`}
+          >
+            <Trash2 size={16} aria-hidden />
+          </button>
         </div>
       </div>
       {showSessions && (
-        <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-700">
+        <div className="mt-3 border-t border-border-subtle pt-3">
           {sessionsLoading && <Spinner label={t("common.loading")} />}
-          {sessionsError && <p className="text-sm text-red-600 dark:text-red-400">{sessionsError}</p>}
+          {sessionsError && <p className="text-sm text-danger">{sessionsError}</p>}
           {sessions !== null && !sessionsLoading && sessions.length === 0 && (
-            <p className="text-sm text-slate-500 dark:text-slate-400">{t("tasks.no_sessions")}</p>
+            <p className="text-sm text-text-muted">{t("tasks.no_sessions")}</p>
           )}
           {sessions !== null && sessions.length > 0 && (
             <ul className="space-y-1 text-xs">
               {sessions.map((session) => (
-                <li key={session.id} className="flex flex-wrap items-center gap-2 text-slate-600 dark:text-slate-300">
+                <li key={session.id} className="flex flex-wrap items-center gap-2 text-text-secondary">
                   <span>{formatDateTime(session.started_at, lang)}</span>
                   <span aria-hidden>→</span>
                   <span>{session.is_open ? t("tasks.session_running") : formatDateTime(session.ended_at, lang)}</span>

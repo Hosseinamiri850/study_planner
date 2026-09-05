@@ -49,7 +49,10 @@
     "course_name_placeholder": "نام درس...",
     "courses_of": "دروس",
     "major_fa_placeholder": "مثلاً: مهندسی برق",
-    "course_fa_placeholder": "مثلاً: آمار"
+    "course_fa_placeholder": "مثلاً: آمار",
+    "show_all_courses": "نمایش همه",
+    "show_fewer_courses": "نمایش کمتر",
+    "empty_courses_hint": "وقتی در درسی مطالعه کنید، پیشرفت اینجا دیده می‌شود."
   },
   "stats": {
     "today_hours": "ساعت امروز",
@@ -59,7 +62,8 @@
     "hours_unit": "ساعت",
     "course_stats": "پیشرفت دروس",
     "weekly": "۷ روز اخیر",
-    "monthly": "۳۰ روز اخیر"
+    "monthly": "۳۰ روز اخیر",
+    "this_week_total": "مجموع این هفته"
   },
   "priority": {
     "high": "مهم",
@@ -160,7 +164,8 @@
     "duration": "مدت",
     "started": "شروع",
     "ended": "پایان",
-    "edit_title": "ویرایش تکلیف"
+    "edit_title": "ویرایش تکلیف",
+    "suggested_course": "درس پیشنهادی"
   },
   "profile": {
     "title": "پروفایل",
@@ -174,7 +179,12 @@
   "errors": {
     "load_failed": "بارگذاری اطلاعات ناموفق بود.",
     "forbidden": "اجازهٔ این کار را ندارید.",
-    "not_found": "یافت نشد."
+    "not_found": "یافت نشد.",
+    "not_found_title": "صفحه پیدا نشد",
+    "not_found_description": "صفحه‌ای که دنبالش بودید وجود ندارد یا جابه‌جا شده.",
+    "forbidden_title": "دسترسی مجاز نیست",
+    "forbidden_description": "اجازه دیدن این بخش را ندارید.",
+    "back_home": "بازگشت به داشبورد"
   },
   "a11y": {
     "main_nav": "اصلی",

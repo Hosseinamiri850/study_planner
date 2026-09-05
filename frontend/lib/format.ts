@@ -12,6 +12,17 @@ export function formatHours(hours: number, lang: Lang): string {
   return formatted;
 }
 
+/** Seconds -> "H:MM:SS" live-timer label (tabular numerals assumed). */
+export function formatClock(totalSeconds: number, lang: Lang): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const asGroup = (n: number) => n.toLocaleString(lang === "fa" ? "fa-IR" : "en-US");
+  return `${asGroup(hours)}:${pad(minutes).replace(/\d/g, (d) => asGroup(Number(d)))}:${pad(seconds).replace(/\d/g, (d) => asGroup(Number(d)))}`;
+}
+
 /** Seconds -> "1h 30m" style label (session durations). */
 export function formatDuration(seconds: number | null | undefined, lang: Lang): string {
   if (seconds == null) return "—";

@@ -3,6 +3,107 @@
 /* Class-strategy dark mode (Tailwind v4): `dark` class on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* ============================================================
+   Design tokens — docs/redesign/04-design-system.md
+   Phase 0: semantic layer maps to the CURRENT palette so the
+   reskin phases (01+) change values here, not at call sites.
+   ============================================================ */
+
+:root {
+  /* Fonts (wired via next/font/local in app/layout.tsx) */
+  --font-sans: var(--font-vazirmatn), "Vazirmatn", "Segoe UI", Tahoma, sans-serif;
+  --font-display: var(--font-space-grotesk), "Segoe UI", sans-serif;
+
+  /* Surfaces (light: paper-leaning neutrals) */
+  --color-bg: oklch(0.985 0.003 80); /* slate-50-equivalent warmth */
+  --color-surface-1: #ffffff;
+  --color-surface-2: oklch(0.968 0.004 80); /* slate-100 equiv */
+  --color-border-subtle: oklch(0.922 0.004 80); /* slate-200 equiv */
+  --color-border-strong: oklch(0.869 0.005 80); /* slate-300 equiv */
+
+  /* Text */
+  --color-text-primary: oklch(0.208 0.006 56); /* slate-900 equiv */
+  --color-text-secondary: oklch(0.446 0.011 62); /* slate-600 equiv */
+  --color-text-muted: oklch(0.446 0.012 62); /* slate-600-equivalent (AA on surface; Phase 6 contrast pass) */
+
+  /* Accent (deep ink-blue — the product's single disciplined accent) */
+  --color-accent: oklch(0.51 0.23 277); /* indigo-600 equiv — Phase 3+ moves this */
+  --color-accent-hover: oklch(0.46 0.22 277); /* indigo-700 equiv */
+  --color-accent-fg: #ffffff;
+  --color-accent-soft: oklch(0.93 0.03 277); /* indigo-100 equiv */
+
+  /* Status — darkened for AA text contrast on surfaces (Phase 6) */
+  --color-success: oklch(0.508 0.139 163); /* emerald-700 equiv */
+  --color-warning: oklch(0.53 0.14 58); /* amber-800-equivalent (AA on surface) */
+  --color-danger: oklch(0.505 0.213 27); /* red-700 equiv */
+  /* Fill-grade danger for solid buttons (dark theme keeps white-fg contrast) */
+  --color-danger-strong: oklch(0.577 0.245 27); /* red-600 equiv */
+
+  /* Radius vocabulary (mixed, per 03) */
+  --radius-surface: 0.75rem; /* 12px — panels */
+  --radius-control: 0.5rem; /* 8px — buttons, inputs */
+  --radius-pill: 999px; /* status only */
+
+  /* Motion */
+  --duration-instant: 80ms;
+  --duration-fast: 150ms;
+  --duration-base: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+}
+
+.dark {
+  /* Surfaces (dark: deep neutral, NOT a gray inversion of light) */
+  --color-bg: oklch(0.175 0.008 262); /* slate-900 equiv */
+  --color-surface-1: oklch(0.245 0.01 262); /* slate-800 equiv */
+  --color-surface-2: oklch(0.295 0.011 262); /* slate-700-equiv step */
+  --color-border-subtle: oklch(0.325 0.012 262); /* slate-700 equiv */
+  --color-border-strong: oklch(0.446 0.011 62); /* slate-600 equiv */
+
+  --color-text-primary: oklch(0.968 0.004 80); /* slate-100 equiv */
+  --color-text-secondary: oklch(0.704 0.014 62); /* slate-400 equiv */
+  --color-text-muted: oklch(0.672 0.013 62); /* slate-350-equivalent (AA on dark surface; Phase 6 contrast pass) */
+
+  --color-accent: oklch(0.68 0.19 277); /* indigo-400 equiv */
+  --color-accent-hover: oklch(0.72 0.18 277); /* indigo-300 equiv */
+  --color-accent-fg: oklch(0.175 0.008 262);
+  --color-accent-soft: oklch(0.34 0.07 277); /* indigo-900/50 equiv */
+
+  --color-success: oklch(0.765 0.15 163); /* emerald-400 equiv */
+  --color-warning: oklch(0.795 0.16 70); /* amber-400 equiv */
+  --color-danger: oklch(0.704 0.191 22); /* red-400 equiv */
+  /* Dark solid danger keeps red-600 so white text passes AA */
+  --color-danger-strong: oklch(0.577 0.245 27); /* red-600 equiv */
+}
+
+/* Map semantic tokens into Tailwind v4 theme so utilities like
+ * bg-surface-1, text-text-primary, border-border-subtle, rounded-surface
+ * resolve to the token values. Values change in later phases without
+ * touching component class names. */
+@theme inline {
+  --color-bg: var(--color-bg);
+  --color-surface-1: var(--color-surface-1);
+  --color-surface-2: var(--color-surface-2);
+  --color-border-subtle: var(--color-border-subtle);
+  --color-border-strong: var(--color-border-strong);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-fg: var(--color-accent-fg);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-danger-strong: var(--color-danger-strong);
+
+  --radius-surface: var(--radius-surface);
+  --radius-control: var(--radius-control);
+
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
+}
+
 html {
   color-scheme: light;
 }
@@ -13,6 +114,22 @@ html.dark {
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-900 dark:text-slate-100;
+  font-family: var(--font-sans);
+}
+
+/* Display face + tabular numerals for stat values / timer (03 pillar 1). */
+.font-display {
+  font-family: var(--font-display);
+  font-feature-settings: "tnum" 1;
+}
+
+/* Tracking must never apply to Persian (joined script) — guard used by
+ * micro-label utility in later phases. Latin-only tracking pattern. */
+[dir="ltr"] .tracking-label {
+  letter-spacing: 0.08em;
+}
+[dir="rtl"] .tracking-label {
+  letter-spacing: 0;
 }
 
 /* Dark-mode override for native controls (select dropdown arrows, date

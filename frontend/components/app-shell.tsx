@@ -1,107 +1,159 @@
 "use client";
 
-/** Authenticated app chrome: top navigation with user identity, theme
- * toggle, language switch, admin link (gated by is_admin — UI gating
- * only; the API enforces), and logout. Responsive: nav collapses to a
- * mobile menu under md. */
+/** Authenticated app chrome, rebuilt on the token layer (Phase 3):
+ * logomark + wordmark, primary nav, UserMenu (avatar + dropdown), segmented
+ * language control, icon theme toggle. Mobile: Radix Dialog sheet with an
+ * identity block. Admin link is gated on is_admin (UI gating only — the
+ * API enforces). */
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Menu, MoonStar, SunMedium, X } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
 import { useTheme } from "@/lib/theme-context";
-import { Button } from "./ui";
+import { LangSwitch } from "./lang-switch";
+import { Logomark } from "./logomark";
+import { UserMenu } from "./user-menu";
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
-  const { t, lang, setLang } = useLang();
+  const { t } = useLang();
   const { theme, toggle } = useTheme();
   const pathname = usePathname();
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const navLink = (href: string, label: string) => {
-    const active = pathname === href || (href !== "/app" && pathname.startsWith(href));
-    return (
-      <Link
-        key={href}
-        href={href}
-        onClick={() => setMenuOpen(false)}
-        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-          active
-            ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
-            : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-        }`}
-      >
-        {label}
-      </Link>
-    );
-  };
+  const navItems = [
+    { href: "/app", label: t("nav.dashboard") },
+    ...(user?.is_admin ? [{ href: "/app/admin", label: t("nav.admin_panel") }] : []),
+    { href: "/app/profile", label: t("profile.title") },
+  ];
 
-  const controls = (
-    <div className="flex items-center gap-2">
-      <select
-        aria-label={t("common.language")}
-        value={lang}
-        onChange={(event) => setLang(event.target.value as "fa" | "en")}
-        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-600 dark:bg-slate-800"
-      >
-        <option value="fa">فا</option>
-        <option value="en">EN</option>
-      </select>
-      <Button variant="ghost" onClick={toggle} aria-label={t("common.toggle_theme")} className="px-2 py-1 text-xs">
-        {theme === "dark" ? "☀️" : "🌙"}
-      </Button>
-      <Button variant="secondary" onClick={() => void logout()} className="px-3 py-1 text-xs">
-        {t("nav.logout")}
-      </Button>
-    </div>
+  const isNavActive = (href: string) =>
+    pathname === href || (href !== "/app" && pathname.startsWith(href));
+
+  const navLinkClass = (active: boolean) =>
+    `rounded-control px-3 py-1.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+      active
+        ? "bg-accent-soft text-accent"
+        : "text-text-secondary hover:bg-surface-2 hover:text-text-primary"
+    }`;
+
+  const navLinks = (onNavigate?: () => void) => (
+    <>
+      {navItems.map(({ href, label }) => (
+        <Link
+          key={href}
+          href={href}
+          onClick={onNavigate}
+          aria-current={isNavActive(href) ? "page" : undefined}
+          className={navLinkClass(isNavActive(href))}
+        >
+          {label}
+        </Link>
+      ))}
+    </>
+  );
+
+  const themeToggle = (extraClass = "") => (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label={t("common.toggle_theme")}
+      className={`flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors duration-150 hover:bg-surface-2 hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${extraClass}`}
+    >
+      {theme === "dark" ? <SunMedium size={18} aria-hidden /> : <MoonStar size={18} aria-hidden />}
+    </button>
   );
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <Link href="/app" className="text-base font-bold text-indigo-600 dark:text-indigo-400">
-              {t("app_name")}
+      <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface-1/90 backdrop-blur">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
+          {/* Brand */}
+          <div className="flex items-center gap-6">
+            <Link
+              href="/app"
+              className="flex items-center gap-2 rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className="text-accent">
+                <Logomark size={24} />
+              </span>
+              <span className="text-sm font-bold text-text-primary">{t("app_name")}</span>
             </Link>
             <nav className="hidden items-center gap-1 md:flex" aria-label={t("a11y.main_nav")}>
-              {navLink("/app", t("nav.dashboard"))}
-              {user?.is_admin && navLink("/app/admin", t("nav.admin_panel"))}
-              {navLink("/app/profile", t("profile.title"))}
+              {navLinks()}
             </nav>
           </div>
-          <div className="hidden items-center gap-3 md:flex">
-            {user && (
-              <span className="text-sm text-slate-600 dark:text-slate-300">{user.fullname}</span>
-            )}
-            {controls}
+
+          {/* Controls */}
+          <div className="hidden items-center gap-2 md:flex">
+            <LangSwitch />
+            {themeToggle()}
+            <UserMenu onLogout={() => void logout()} />
           </div>
-          <button
-            type="button"
-            aria-expanded={menuOpen}
-            aria-label={t("a11y.menu")}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 md:hidden dark:text-slate-300 dark:hover:bg-slate-700"
-            onClick={() => setMenuOpen((open) => !open)}
-          >
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-              <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </button>
+
+          {/* Mobile trigger */}
+          <Dialog.Root open={mobileOpen} onOpenChange={setMobileOpen}>
+            <Dialog.Trigger asChild>
+              <button
+                type="button"
+                aria-label={t("a11y.menu")}
+                className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
+              >
+                <Menu size={20} aria-hidden />
+              </button>
+            </Dialog.Trigger>
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 z-50 bg-slate-900/50" />
+              <div className="fixed inset-x-0 top-0 z-50 flex justify-start p-0">
+                <Dialog.Content className="h-dvh w-72 max-w-[85vw] rounded-surface border-y-0 border-border-subtle bg-surface-1 shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out">
+                  <div className="flex h-full flex-col">
+                    <div className="flex items-center justify-between border-b border-border-subtle px-4 py-3">
+                      <span className="flex items-center gap-2 text-accent">
+                        <Logomark size={22} />
+                        <span className="text-sm font-bold text-text-primary">{t("app_name")}</span>
+                      </span>
+                      <Dialog.Close asChild>
+                        <button
+                          type="button"
+                          aria-label={t("common.close")}
+                          className="flex h-9 w-9 items-center justify-center rounded-control text-text-secondary hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                        >
+                          <X size={18} aria-hidden />
+                        </button>
+                      </Dialog.Close>
+                    </div>
+                    <Dialog.Title className="sr-only">{t("a11y.menu")}</Dialog.Title>
+                    <nav
+                      className="flex flex-col gap-1 px-3 py-3"
+                      aria-label={t("a11y.mobile_nav")}
+                    >
+                      {navLinks(() => setMobileOpen(false))}
+                    </nav>
+                    <div className="mt-auto space-y-3 border-t border-border-subtle px-4 py-4">
+                      {user && (
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-text-primary">
+                            {user.fullname || user.username}
+                          </p>
+                          <p className="truncate text-xs text-text-muted">@{user.username}</p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <LangSwitch />
+                        {themeToggle()}
+                      </div>
+                    </div>
+                  </div>
+                </Dialog.Content>
+              </div>
+            </Dialog.Portal>
+          </Dialog.Root>
         </div>
-        {menuOpen && (
-          <nav className="flex flex-col gap-1 border-t border-slate-200 px-4 py-2 md:hidden dark:border-slate-700" aria-label={t("a11y.mobile_nav")}>
-            {navLink("/app", t("nav.dashboard"))}
-            {user?.is_admin && navLink("/app/admin", t("nav.admin_panel"))}
-            {navLink("/app/profile", t("profile.title"))}
-            <div className="flex items-center justify-between py-1">
-              {user && <span className="text-sm text-slate-600 dark:text-slate-300">{user.fullname}</span>}
-              {controls}
-            </div>
-          </nav>
-        )}
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
     </div>
