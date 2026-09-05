@@ -74,7 +74,7 @@ def runner(app):
 @pytest.fixture
 def create_user(app):
     counter = {"n": 0}
-    def _create_user(username=None, password="testpass123", fullname="Test User", is_admin=False):
+    def _create_user(username=None, password="testpass123", fullname="Test User", is_admin=False, role=None):
         counter["n"] += 1
         if username is None:
             username = f"user_{counter['n']}_{uuid.uuid4().hex[:6]}"
@@ -83,6 +83,7 @@ def create_user(app):
             password=generate_password_hash(password),
             fullname=fullname,
             is_admin=is_admin,
+            **({"role": role} if role is not None else {}),
         )
         db.session.add(user)
         db.session.commit()

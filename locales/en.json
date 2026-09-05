@@ -5,7 +5,8 @@
   "nav": {
     "logout": "Logout",
     "admin_panel": "Admin Panel",
-    "dashboard": "Dashboard"
+    "dashboard": "Dashboard",
+    "school_admin": "School Admin"
   },
   "auth": {
     "login_title": "Sign In",
@@ -191,5 +192,21 @@
     "mobile_nav": "Mobile",
     "menu": "Menu",
     "pagination": "Pagination"
+  },
+  "school": {
+    "title": "School Administration",
+    "students": "Students",
+    "teachers": "Teachers",
+    "classes": "Classes",
+    "class_name": "Class name",
+    "grade_optional": "Grade level (optional)",
+    "grade": "Grade",
+    "assign_class": "Assign to class",
+    "unassigned": "Unassigned",
+    "no_class": "No class yet",
+    "no_students": "No students in your institution yet.",
+    "no_teachers": "No teachers in your institution yet.",
+    "no_classes": "No classes yet — create the first one above.",
+    "rename_class_confirm": "Apply this change to the class?"
   }
 }

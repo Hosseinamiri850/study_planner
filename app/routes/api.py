@@ -157,7 +157,7 @@ def logout():
 def me():
     """Current user profile from the Bearer access token."""
     user = g.api_user
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "theme": user.theme, "created_at": user.created_at.isoformat()}})
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "role": user.role, "theme": user.theme, "created_at": user.created_at.isoformat()}})
 
 
 @api_bp.route("/me", methods=["PUT"])
@@ -201,7 +201,7 @@ def update_me():
         RefreshTokenRepo.revoke_all_for_user(user.id)
 
     UserRepo.commit()
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "theme": user.theme, "created_at": user.created_at.isoformat()}})
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "role": user.role, "theme": user.theme, "created_at": user.created_at.isoformat()}})
 
 
 def _course_payload(course):

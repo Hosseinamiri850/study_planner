@@ -5,7 +5,8 @@
   "nav": {
     "logout": "خروج",
     "admin_panel": "پنل مدیریت",
-    "dashboard": "داشبورد"
+    "dashboard": "داشبورد",
+    "school_admin": "پنل مدرسه"
   },
   "auth": {
     "login_title": "ورود به حساب",
@@ -191,5 +192,21 @@
     "mobile_nav": "موبایل",
     "menu": "منو",
     "pagination": "صفحه‌بندی"
+  },
+  "school": {
+    "title": "مدیریت مدرسه",
+    "students": "دانش‌آموزان",
+    "teachers": "معلمان",
+    "classes": "کلاس‌ها",
+    "class_name": "نام کلاس",
+    "grade_optional": "پایه تحصیلی (اختیاری)",
+    "grade": "پایه",
+    "assign_class": "انتقال به کلاس",
+    "unassigned": "بدون کلاس",
+    "no_class": "هنوز کلاسی نیست",
+    "no_students": "هنوز دانش‌آموزی در مؤسسه شما نیست.",
+    "no_teachers": "هنوز معلمی در مؤسسه شما نیست.",
+    "no_classes": "هنوز کلاسی نیست — اولین کلاس را از بالا بسازید.",
+    "rename_class_confirm": "این تغییر برای کلاس اعمال شود؟"
   }
 }
