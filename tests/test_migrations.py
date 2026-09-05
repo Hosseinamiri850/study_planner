@@ -122,18 +122,39 @@ def roles_migration(app):
 
 
 def _reshape_to_pre_roles_schema():
-    """Reshape the freshly created schema back to the pre-migration state:
-    drop role/institution_id, restore the legacy is_admin boolean. Must run
-    AFTER seeding users (the ORM INSERT references the new columns) and
-    BEFORE the migration — conftest uses db.create_all(), so the migration
-    under test runs against the exact state production rows are in."""
+    """Reshape the freshly created schema back to the pre-20260906_01 state:
+    a users table with a legacy is_admin boolean and no role/institution/
+    class columns. The current schema has live FK constraints on
+    users.institution_id and users.class_id; SQLite validates FK references
+    even when dropping columns with foreign_keys=OFF, so a plain
+    ALTER TABLE DROP COLUMN cannot remove them — the table is rebuilt
+    instead (standard SQLite 12-step ALTER procedure, minus the pragma
+    steps the test connection doesn't need).
+
+    Must run AFTER seeding users (the ORM INSERT references the new
+    columns) and BEFORE the migration under test."""
     db.session.execute(db.text("DROP INDEX IF EXISTS ix_users_role"))
-    db.session.execute(db.text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
+    db.session.execute(db.text("ALTER TABLE users RENAME TO users_new"))
+    db.session.execute(db.text(
+        "CREATE TABLE users ("
+        "id INTEGER NOT NULL PRIMARY KEY, "
+        "username VARCHAR(80) NOT NULL, "
+        "password VARCHAR(255) NOT NULL, "
+        "fullname VARCHAR(150) NOT NULL, "
+        "is_admin BOOLEAN NOT NULL DEFAULT 0, "
+        "theme VARCHAR(10) NOT NULL, "
+        "created_at DATE NOT NULL, "
+        "UNIQUE (username)"
+        ")"
+    ))
     # Carry the admin bit over from role BEFORE dropping it, mirroring what
     # a real pre-migration database holds in its is_admin column.
-    db.session.execute(db.text("UPDATE users SET is_admin = 1 WHERE role = 'site_admin'"))
-    db.session.execute(db.text("ALTER TABLE users DROP COLUMN role"))
-    db.session.execute(db.text("ALTER TABLE users DROP COLUMN institution_id"))
+    db.session.execute(db.text(
+        "INSERT INTO users (id, username, password, fullname, is_admin, theme, created_at) "
+        "SELECT id, username, password, fullname, CASE WHEN role = 'site_admin' THEN 1 ELSE 0 END, theme, created_at "
+        "FROM users_new"
+    ))
+    db.session.execute(db.text("DROP TABLE users_new"))
     db.session.commit()
 
 

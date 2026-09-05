@@ -4,7 +4,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Course, Major, User
+from app.models import Class, Course, Major, User
+from app.models.institution import VALID_INSTITUTION_TYPES
 from app.models.task import _utcnow
 from app.models.user import VALID_ROLES
 from app.services.seed import seed_reference_data
@@ -80,13 +81,14 @@ class TestUserRole:
             user.role = role
             assert user.is_admin is False, role
 
-    def test_institution_id_nullable_and_storable(self, create_user):
+    def test_institution_id_nullable_and_storable(self, create_user, create_institution):
         user = create_user(username="institutionless")
         assert user.institution_id is None
-        user.institution_id = 42
+        institution = create_institution(name="Salam High School")
+        user.institution_id = institution.id
         db.session.commit()
         reloaded = db.session.get(User, user.id)
-        assert reloaded.institution_id == 42
+        assert reloaded.institution_id == institution.id
 
     def test_valid_roles_constant_covers_all(self):
         assert VALID_ROLES == ("student", "teacher", "school_admin", "site_admin", "support")
@@ -97,6 +99,53 @@ class TestUserRole:
         db.session.add(user)
         db.session.commit()
         assert db.session.get(User, user.id).role == "site_admin"
+
+
+class TestInstitutionModel:
+    """Multi-tenancy: Institution + Class tables on the shared database."""
+
+    def test_create_institution_defaults(self, create_institution):
+        institution = create_institution(name="Azad University")
+        assert institution.id is not None
+        assert institution.name == "Azad University"
+        assert institution.type == "school"
+        assert institution.plan_tier == "free"
+        assert institution.created_at == date.today()
+
+    def test_institution_type_values(self, create_institution):
+        for inst_type in VALID_INSTITUTION_TYPES:
+            institution = create_institution(name=f"inst_{inst_type}", type=inst_type)
+            assert institution.type == inst_type
+
+    def test_classes_relationship_cascade(self, create_institution, create_class):
+        institution = create_institution(name="Cascade School")
+        klass1 = create_class(institution=institution, name="Grade 10A")
+        klass2 = create_class(institution=institution, name="Grade 10B")
+        assert institution.classes.count() == 2
+        assert klass1.institution == institution
+        db.session.delete(institution)
+        db.session.commit()
+        assert db.session.get(Class, klass1.id) is None
+        assert db.session.get(Class, klass2.id) is None
+
+    def test_class_grade_level_nullable(self, create_class):
+        klass = create_class(name="No Grade", grade_level=None)
+        assert klass.grade_level is None
+        graded = create_class(name="Graded", grade_level="10")
+        assert graded.grade_level == "10"
+
+    def test_user_class_link(self, create_user, create_class):
+        klass = create_class(name="Physics 101")
+        user = create_user(username="classy")
+        user.class_id = klass.id
+        db.session.commit()
+        reloaded = db.session.get(User, user.id)
+        assert reloaded.class_id == klass.id
+
+    def test_b2c_users_unaffected(self, create_user):
+        user = create_user(username="solo")
+        assert user.institution_id is None
+        assert user.class_id is None
 
 
 class TestMajorModel:

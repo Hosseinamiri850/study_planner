@@ -9,6 +9,7 @@ primary. See `.ai/DESIGN.md` and `.ai/ROADMAP.md` (TASK-039).
 
 from app.repositories.base import Repo, read_session, write_session
 from app.repositories.course_repo import CourseRepo
+from app.repositories.institution_repo import ClassRepo, InstitutionRepo
 from app.repositories.major_repo import MajorRepo
 from app.repositories.refresh_token_repo import RefreshTokenRepo
 from app.repositories.task_repo import TaskRepo
@@ -18,7 +19,9 @@ __all__ = [
     "Repo",
     "read_session",
     "write_session",
+    "ClassRepo",
     "CourseRepo",
+    "InstitutionRepo",
     "MajorRepo",
     "RefreshTokenRepo",
     "TaskRepo",
