@@ -19,3 +19,7 @@ instance/
 # Graphify generated knowledge-graph output (regenerable via graphify extract)
 graphify-out/
 .graphifyignore
+e2e-school.db
+instance/e2e-school.db
+frontend/test-results/
+test-results/
