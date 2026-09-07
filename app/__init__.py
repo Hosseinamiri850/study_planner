@@ -73,6 +73,10 @@ def create_app(config_object=None):
         seed_reference_data()
         click.echo("Reference data seeded.")
 
+    from scripts.seed_e2e import seed_e2e
+
+    app.cli.add_command(seed_e2e)
+
     @app.cli.command("create-admin")
     @click.argument("username")
     @click.option("--promote", is_flag=True, help="Grant admin role to an existing user instead of creating one.")
