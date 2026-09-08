@@ -15,6 +15,7 @@ import { Menu, MoonStar, SunMedium, X } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
 import { useTheme } from "@/lib/theme-context";
+import { ImpersonationBanner } from "./impersonation-banner";
 import { LangSwitch } from "./lang-switch";
 import { Logomark } from "./logomark";
 import { UserMenu } from "./user-menu";
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     ...(user?.is_admin ? [{ href: "/app/admin", label: t("nav.admin_panel") }] : []),
     ...(user?.role === "school_admin" ? [{ href: "/app/school-admin", label: t("nav.school_admin") }] : []),
     ...(user?.role === "site_admin" ? [{ href: "/app/site-admin", label: t("nav.site_admin") }] : []),
+    ...(user?.role === "support" ? [{ href: "/app/support", label: t("nav.support") }] : []),
     { href: "/app/profile", label: t("profile.title") },
   ];
 
@@ -73,6 +75,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
+      <ImpersonationBanner />
       <header className="sticky top-0 z-40 border-b border-border-subtle bg-surface-1/90 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
           {/* Brand */}

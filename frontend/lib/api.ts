@@ -25,6 +25,7 @@ import type {
   CreateTaskInput,
   CreatedInstitutionResponse,
   DashboardStats,
+  ImpersonateResponse,
   Major,
   MajorListResponse,
   MeUser,
@@ -36,6 +37,7 @@ import type {
   SchoolUsersResponse,
   SiteInstitutionsResponse,
   StudySession,
+  SupportUsersResponse,
   StudySessionListResponse,
   Task,
   TaskListPaginatedResponse,
@@ -231,6 +233,37 @@ export class ApiClient {
     if (filters.per_page != null) params.set("per_page", String(filters.per_page));
     const query = params.toString();
     return this.request(`/api/proxy/site/audit-log${query ? `?${query}` : ""}`);
+  }
+
+  // --- support (global, read-only + impersonation) ---
+
+  supportInstitutions(): Promise<SiteInstitutionsResponse> {
+    return this.request("/api/proxy/support/institutions");
+  }
+
+  supportUsers(filters: { query?: string; role?: string; page?: number; per_page?: number }): Promise<SupportUsersResponse> {
+    const params = new URLSearchParams();
+    if (filters.query) params.set("query", filters.query);
+    if (filters.role) params.set("role", filters.role);
+    if (filters.page != null) params.set("page", String(filters.page));
+    if (filters.per_page != null) params.set("per_page", String(filters.per_page));
+    const query = params.toString();
+    return this.request(`/api/proxy/support/users${query ? `?${query}` : ""}`);
+  }
+
+  supportAuditLog(filters: { institution_id?: number; action?: string; actor_user_id?: number; page?: number; per_page?: number }): Promise<AuditLogResponse> {
+    const params = new URLSearchParams();
+    if (filters.institution_id != null) params.set("institution_id", String(filters.institution_id));
+    if (filters.action) params.set("action", filters.action);
+    if (filters.actor_user_id != null) params.set("actor_user_id", String(filters.actor_user_id));
+    if (filters.page != null) params.set("page", String(filters.page));
+    if (filters.per_page != null) params.set("per_page", String(filters.per_page));
+    const query = params.toString();
+    return this.request(`/api/proxy/support/audit-log${query ? `?${query}` : ""}`);
+  }
+
+  impersonate(userId: number): Promise<ImpersonateResponse> {
+    return this.post(`/api/proxy/support/impersonate/${userId}`);
   }
 
   // --- translate ---

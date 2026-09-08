@@ -42,6 +42,12 @@ interface AuthState {
   setToken: (token: string) => void;
   /** Re-pull /api/me into state (after profile edits). */
   refreshUser: () => Promise<void>;
+  /** Support impersonation (TASK-040): adopt the impersonated identity
+   * while remembering the agent session to restore. In-memory only — a
+   * page reload ends it, matching the token's own expiry. */
+  beginImpersonation: (targetUser: MeUser, accessToken: string) => void;
+  endImpersonation: () => void;
+  impersonating: boolean;
 }
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -49,12 +55,19 @@ const AuthContext = createContext<AuthState | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MeUser | null>(null);
   const [status, setStatus] = useState<AuthState["status"]>("loading");
+  const [impersonating, setImpersonating] = useState(false);
   const accessToken = useRef<string | null>(null);
+  // Support agent's own token, stashed while impersonating.
+  const savedAgentToken = useRef<string | null>(null);
+  const savedAgentUser = useRef<MeUser | null>(null);
   const refreshing = useRef<Promise<boolean> | null>(null);
   const router = useRouter();
 
   const resetSession = useCallback(() => {
     accessToken.current = null;
+    savedAgentToken.current = null;
+    savedAgentUser.current = null;
+    setImpersonating(false);
     setUser(null);
     setStatus("unauthenticated");
   }, []);
@@ -145,6 +158,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     accessToken.current = token;
   }, []);
 
+  const beginImpersonation = useCallback((targetUser: MeUser, token: string) => {
+    savedAgentToken.current = accessToken.current;
+    savedAgentUser.current = user;
+    accessToken.current = token;
+    setUser(targetUser);
+    setImpersonating(true);
+  }, [user]);
+
+  const endImpersonation = useCallback(() => {
+    if (savedAgentToken.current) {
+      accessToken.current = savedAgentToken.current;
+      setUser(savedAgentUser.current);
+    }
+    savedAgentToken.current = null;
+    savedAgentUser.current = null;
+    setImpersonating(false);
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await api.logout();
@@ -169,8 +200,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, status, api, logout, signIn, setToken, refreshUser }),
-    [user, status, api, logout, signIn, setToken, refreshUser],
+    () => ({ user, status, api, logout, signIn, setToken, refreshUser, beginImpersonation, endImpersonation, impersonating }),
+    [user, status, api, logout, signIn, setToken, refreshUser, beginImpersonation, endImpersonation, impersonating],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

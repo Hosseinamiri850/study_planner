@@ -157,7 +157,10 @@ def logout():
 def me():
     """Current user profile from the Bearer access token."""
     user = g.api_user
-    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "role": user.role, "theme": user.theme, "created_at": user.created_at.isoformat()}})
+    # Support impersonation (TASK-040): expose the claim so the SPA can
+    # show the persistent "viewing as" banner; None on normal tokens.
+    impersonator_id = getattr(g, "api_impersonator_id", None)
+    return jsonify({"user": {"id": user.id, "username": user.username, "fullname": user.fullname, "is_admin": user.is_admin, "role": user.role, "theme": user.theme, "created_at": user.created_at.isoformat()}, "impersonator_id": impersonator_id})
 
 
 @api_bp.route("/me", methods=["PUT"])

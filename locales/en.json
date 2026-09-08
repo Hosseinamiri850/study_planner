@@ -7,7 +7,8 @@
     "admin_panel": "Admin Panel",
     "dashboard": "Dashboard",
     "school_admin": "School Admin",
-    "site_admin": "Site Admin"
+    "site_admin": "Site Admin",
+    "support": "Support"
   },
   "auth": {
     "login_title": "Sign In",
@@ -236,5 +237,25 @@
     "next": "Next",
     "page_of": "Page {page} of {pages} ({total} entries)",
     "created_admin_note": "Institution created. The first administrator can sign in with the credentials you set."
+  },
+  "support": {
+    "title": "Support Console",
+    "institutions": "Institutions",
+    "users": "Users",
+    "search_users": "Search users (username or name)",
+    "impersonate": "Impersonate",
+    "no_users": "No users match.",
+    "audit_log": "Audit log",
+    "filter_institution": "Institution",
+    "filter_action": "Action",
+    "filter_actor": "Actor ID",
+    "all_institutions": "All institutions",
+    "no_audit": "No audit entries match.",
+    "prev": "Previous",
+    "next": "Next",
+    "page_of": "Page {page} of {pages} ({total} entries)",
+    "banner_viewing": "Viewing as {username} — support session, expires in {minutes} min",
+    "banner_exit": "Exit",
+    "read_only_note": "Support access is read-only; actions you take while impersonating are audited with your agent id."
   }
 }
