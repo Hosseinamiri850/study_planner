@@ -77,6 +77,72 @@ class TestSupportReads:
         assert entry["students"] == 1
         assert entry["classes"] == 1
 
+
+class TestSupportSiteParity:
+    """TASK-041 (product decision): support carries site_admin's permission
+    level — every /api/site/* endpoint and the generic admin-write guard
+    admit support directly. The role value stays distinct in the DB."""
+
+    def test_support_reads_site_institutions(self, client):
+        _make_user("par1", role=ROLE_SUPPORT)
+        headers = _login(client, "par1")
+        assert client.get("/api/site/institutions", headers=headers).status_code == 200
+
+    def test_support_creates_institution_and_first_admin(self, client):
+        agent = _make_user("par2", role=ROLE_SUPPORT)
+        headers = _login(client, "par2")
+        response = client.post("/api/site/institutions", headers=headers, json={
+            "name": "Support Made", "admin_username": "sm_admin", "admin_password": "longenough1",
+        })
+        assert response.status_code == 201
+        body = response.get_json()
+        assert body["admin"]["role"] == ROLE_SCHOOL_ADMIN
+        row = AuditLog.query.filter_by(action="institution.create").one()
+        assert row.actor_user_id == agent.id
+        assert User.query.filter_by(username="sm_admin").one().role == ROLE_SCHOOL_ADMIN
+
+    def test_support_updates_plan_tier(self, client, create_institution):
+        _make_user("par3", role=ROLE_SUPPORT)
+        headers = _login(client, "par3")
+        inst = create_institution(name="Parity Tier")
+        response = client.put(f"/api/site/institutions/{inst.id}", headers=headers, json={"plan_tier": "pro"})
+        assert response.status_code == 200
+        assert response.get_json()["institution"]["plan_tier"] == "pro"
+        row = AuditLog.query.filter_by(action="institution.plan_change").one()
+        assert row.before["plan_tier"] == "free"
+        assert row.after["plan_tier"] == "pro"
+
+    def test_support_reads_site_audit_log(self, client):
+        _make_user("par4", role=ROLE_SUPPORT)
+        headers = _login(client, "par4")
+        assert client.get("/api/site/audit-log", headers=headers).status_code == 200
+
+    def test_support_passes_generic_admin_write_guard(self, client):
+        """The is_admin shim now admits support — /api/majors (a
+        write-guarded endpoint) must accept a support token."""
+        _make_user("par5", role=ROLE_SUPPORT)
+        headers = _login(client, "par5")
+        response = client.post("/api/majors", headers=headers, json={"name_fa": "ریاضی", "name_en": "Math"})
+        assert response.status_code == 201
+
+    def test_school_admin_still_403_on_site_endpoints(self, client, create_institution):
+        """Parity widened support, not school_admin — the institution-scoped
+        role stays locked out of /api/site/*."""
+        inst = create_institution(name="Sch")
+        _make_user("parity_sch", role=ROLE_SCHOOL_ADMIN, institution=inst)
+        headers = _login(client, "parity_sch")
+        assert client.get("/api/site/institutions", headers=headers).status_code == 403
+        assert client.get("/api/site/audit-log", headers=headers).status_code == 403
+
+    def test_me_reports_is_admin_for_support(self, client):
+        """SPA gating reads /api/me's is_admin — support must now get true,
+        while `role` stays 'support' so the UI can still distinguish."""
+        _make_user("par6", role=ROLE_SUPPORT)
+        headers = _login(client, "par6")
+        me = client.get("/api/me", headers=headers).get_json()
+        assert me["user"]["is_admin"] is True
+        assert me["user"]["role"] == ROLE_SUPPORT
+
     def test_user_search_by_username_and_fullname(self, client, create_user):
         _make_user("agent2", role=ROLE_SUPPORT)
         headers = _login(client, "agent2")

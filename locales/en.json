@@ -256,6 +256,6 @@
     "page_of": "Page {page} of {pages} ({total} entries)",
     "banner_viewing": "Viewing as {username} — support session, expires in {minutes} min",
     "banner_exit": "Exit",
-    "read_only_note": "Support access is read-only; actions you take while impersonating are audited with your agent id."
+    "read_only_note": "Support holds full site-admin permissions; actions you take while impersonating are audited with your agent id."
   }
 }

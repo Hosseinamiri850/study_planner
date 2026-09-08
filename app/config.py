@@ -29,6 +29,10 @@ class Config:
     REDIS_URL = os.environ.get("REDIS_URL", "")
     # Auth endpoints are brute-force targets — allow 5 attempts per minute.
     RATELIMIT_AUTH = "5 per minute"
+    # Kill switch for tests/E2E (RATELIMIT_ENABLED=False): Flask-Limiter
+    # reads this key directly; without the env-backed entry the E2E webServer
+    # env had no effect and repeated logins tripped the 5/min limiter.
+    RATELIMIT_ENABLED = os.environ.get("RATELIMIT_ENABLED", "true").lower() != "false"
     # Sentry is optional: blank DSN → SDK never initializes. Set via env in prod.
     SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
     SENTRY_ENVIRONMENT = os.environ.get("SENTRY_ENVIRONMENT", "production")

@@ -2,8 +2,9 @@
 
 Mirrors app/routes/school.py in shape and security posture, with the
 opposite scope: no institution filtering anywhere — the site_admin role
-is global by definition. The guard (app/utils/site.py) admits only
-role == site_admin; a school_admin gets 403 on every endpoint here.
+is global by definition. The guard (app/utils/site.py) admits the
+site-level roles (site_admin, and support since TASK-041 parity);
+a school_admin gets 403 on every endpoint here.
 
 `POST /institutions` is the one-request "create tenant + first admin"
 flow that `create-admin --promote` does from the CLI. The created user's

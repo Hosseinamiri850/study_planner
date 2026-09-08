@@ -39,8 +39,12 @@ class User(db.Model):
         field on /api/me keep working while the RBAC rollout lands. The
         declarative constructor routes `User(is_admin=...)` kwargs through
         the setter too, so creation call sites are unchanged.
+
+        TASK-041 (product decision): support carries the same permission
+        level as site_admin — this shim admits both. The roles stay
+        distinct values in the DB for reporting; only the check widened.
         """
-        return self.role == ROLE_SITE_ADMIN
+        return self.role in (ROLE_SITE_ADMIN, ROLE_SUPPORT)
 
     @is_admin.setter
     def is_admin(self, value):
