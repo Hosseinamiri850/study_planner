@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * E2E: support flow (TASK-040) — read-only console + audited impersonation.
- * Fixtures come from scripts/seed_e2e.py: e2e_support (agent),
- * e2e_site_root (site_admin — unimpersonatable), e2e_stu_a2 (student).
- * Password for every fixture: E2ePass!2026. Persian-first UI selectors.
+ * E2E: support flow (TASK-040, widened TASK-041) — site-level console +
+ * audited impersonation. Fixtures come from scripts/seed_e2e.py:
+ * e2e_support (agent), e2e_site_root (site_admin — unimpersonatable),
+ * e2e_stu_a2 (student). Password for every fixture: E2ePass!2026.
+ * Persian-first UI selectors.
  */
 
 const PASSWORD = "E2ePass!2026";
@@ -99,5 +100,30 @@ test.describe("support console (read-only + audited impersonation)", () => {
     await expect(page.getByText("impersonation.start").first()).toBeVisible({ timeout: 20_000 });
     // actor:support + target:student recorded.
     await expect(page.getByText(/actor:\d+/).first()).toBeVisible();
+  });
+});
+
+test.describe("support site-level parity (TASK-041)", () => {
+  test("agent creates an institution + first admin through the shared card", async ({ page }) => {
+    await login(page, "e2e_support");
+    await page.getByRole("link", { name: "پشتیبانی" }).click();
+    await expect(page).toHaveURL(/\/app\/support/, { timeout: 15_000 });
+    await expect(page.getByRole("heading", { name: "کنسول پشتیبانی" })).toBeVisible({ timeout: 25_000 });
+
+    // Shared SiteInstitutionsCard (same component as /app/site-admin):
+    // create-tenant form is present, not just a read-only list.
+    await expect(page.getByRole("heading", { name: "ایجاد مؤسسه" })).toBeVisible({ timeout: 15_000 });
+
+    const suffix = `${Date.now() % 100000}`;
+    const instName = `E2E Parity ${suffix}`;
+    await page.getByLabel("نام مؤسسه").fill(instName);
+    await page.getByLabel("نام کاربری مدیر").fill(`e2e_par_${suffix}`);
+    await page.getByLabel("گذرواژه مدیر").fill("E2ePass!2026");
+    await page.getByRole("button", { name: "+ ایجاد" }).click();
+
+    // Success note names the minted first admin.
+    await expect(page.getByText(/e2e_par_/).first()).toBeVisible({ timeout: 20_000 });
+    // New institution appears in the list.
+    await expect(page.getByText(instName).first()).toBeVisible({ timeout: 20_000 });
   });
 });

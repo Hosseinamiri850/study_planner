@@ -1,19 +1,23 @@
 "use client";
 
-/** Support Console (TASK-040): global READ-ONLY visibility — institutions
- * with counts, user search across B2C + all tenants, the global audit
- * log — plus the one deliberate exception: impersonation. Clicking
- * "Impersonate" mints a short-lived token as that user and swaps the SPA
- * session to it (in-memory; a reload ends it, like the token). Every
- * action taken under the impersonated token is audited with the agent's
- * id server-side; admin surfaces reject impersonation tokens outright.
- * Gated on `role === "support"` (UI gating only — the API enforces). */
+/** Support Console (TASK-040, widened TASK-041): support carries
+ * site_admin permission parity — the institution card (create tenant +
+ * first admin, plan_tier editing) is the same component /app/site-admin
+ * renders, backed by /api/site/*. Support-specific: user search across
+ * B2C + all tenants and impersonation. Clicking "Impersonate" mints a
+ * short-lived token as that user and swaps the SPA session to it
+ * (in-memory; a reload ends it, like the token). Every action taken
+ * under the impersonated token is audited with the agent's id
+ * server-side; impersonated tokens cannot reach admin surfaces, and
+ * support/site_admin targets can never be impersonated. Gated on
+ * `role === "support"` (UI gating only — the API enforces). */
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Headset } from "lucide-react";
 
 import { Alert, Badge, Button, Card, Input, Skeleton } from "@/components/ui";
+import { SiteInstitutionsCard } from "@/components/site-institutions-card";
 import { useToast } from "@/components/toast";
 import { useAuth } from "@/lib/auth-context";
 import { errorMessage } from "@/lib/errors";
@@ -148,52 +152,22 @@ export default function SupportPage() {
           {lang === "fa" ? "منطقه پشتیبانی" : "Support zone"}
         </p>
         <h1 className="mt-0.5 text-xl font-bold text-text-primary">{t("support.title")}</h1>
-        <p className="mt-1 text-xs text-text-muted">{t("support.read_only_note")}</p>
       </div>
 
-      {loadError && (
-        <Alert tone="error">
-          {loadError}{" "}
-          <Button variant="secondary" size="sm" className="ms-2" onClick={() => void loadInstitutions()}>
-            {t("common.retry")}
-          </Button>
-        </Alert>
-      )}
       {actionError && <Alert tone="error">{actionError}</Alert>}
 
-      {!institutions && !loadError && (
-        <Card className="space-y-2 p-5">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-8 w-full" />
-          ))}
-        </Card>
-      )}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <SiteInstitutionsCard
+          institutions={institutions}
+          loadError={loadError}
+          onRetry={() => void loadInstitutions()}
+          onActionError={setActionError}
+          onChanged={loadInstitutions}
+        />
 
-      {institutions && (
-        <div className="grid gap-6 xl:grid-cols-2">
+        <div className="space-y-6">
           <Card className="p-5">
-            <h2 className="mb-3 text-base font-semibold text-text-primary">{t("support.institutions")}</h2>
-            {institutions.length === 0 ? (
-              <p className="text-xs text-text-muted">{t("site.no_institutions")}</p>
-            ) : (
-              <ul className="space-y-2">
-                {institutions.map((institution) => (
-                  <li key={institution.id} className="flex items-center justify-between rounded-control border border-border-subtle px-3 py-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-text-primary" dir="auto">{institution.name}</p>
-                      <p className="text-xs text-text-muted" dir="auto">
-                        <Badge>{institution.type}</Badge> {institution.plan_tier}
-                      </p>
-                    </div>
-                    <p className="text-xs text-text-muted" dir="auto">
-                      {institution.students} {t("site.students")} · {institution.classes} {t("site.classes")}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <h2 className="mb-3 mt-6 text-base font-semibold text-text-primary">{t("support.users")}</h2>
+            <h2 className="mb-3 text-base font-semibold text-text-primary">{t("support.users")}</h2>
             <Input
               aria-label={t("support.search_users")}
               value={searchQuery}
@@ -312,7 +286,7 @@ export default function SupportPage() {
             )}
           </Card>
         </div>
-      )}
+      </div>
     </div>
   );
 }

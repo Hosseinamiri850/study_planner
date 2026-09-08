@@ -76,10 +76,19 @@ class TestUserRole:
         assert user.role == "student"
 
     def test_non_site_admin_roles_not_admin(self, create_user):
-        for role in ("teacher", "school_admin", "support", "student"):
+        # support carries site_admin parity since TASK-041 — only these
+        # roles remain below the admin shim.
+        for role in ("teacher", "school_admin", "student"):
             user = create_user(username=f"role_{role}")
             user.role = role
             assert user.is_admin is False, role
+
+    def test_support_role_has_admin_parity(self, create_user):
+        """TASK-041: support == site_admin permission level. Distinct role
+        value in the DB, same admin surface."""
+        agent = create_user(username="parityagent", role="support")
+        assert agent.is_admin is True
+        assert agent.role != "site_admin"
 
     def test_institution_id_nullable_and_storable(self, create_user, create_institution):
         user = create_user(username="institutionless")

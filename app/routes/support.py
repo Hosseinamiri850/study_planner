@@ -1,21 +1,24 @@
-"""Global, read-mostly API for support agents (TASK-040).
+"""Global API for support agents (TASK-040).
 
-Shape mirrors app/routes/site.py; the scope differs: support is read-only
-across everything EXCEPT one deliberate exception — impersonation. A
-support agent may mint a short-lived access token that authenticates AS
-another user to reproduce their view, but:
+Shape mirrors app/routes/site.py. Since TASK-041 (product decision),
+support carries the same permission level as site_admin — full
+site-level access via /api/site/*, not read-only. What remains
+support-specific here:
 
-- The token's lifetime is identical to a normal access token (no
-  extension). Impersonation ends when the token expires — there is no
-  "end impersonation" endpoint; none is needed because the token is
-  stateless and self-expiring.
-- Every such token carries an `impersonator_id` claim. All audit rows
-  written while it is in use record both the acting user and the agent
-  behind them, and the school/site guards refuse impersonated tokens
-  outright (app/utils/school.py, app/utils/site.py).
-- A support agent may never impersonate another support agent or a
-  site_admin — those roles' actions must never be attributable to a
-  support session.
+- Impersonation: a support agent may mint a short-lived access token
+  that authenticates AS another user to reproduce their view.
+  - The token's lifetime is identical to a normal access token (no
+    extension). Impersonation ends when the token expires — there is no
+    "end impersonation" endpoint; none is needed because the token is
+    stateless and self-expiring.
+  - Every such token carries an `impersonator_id` claim. All audit rows
+    written while it is in use record both the acting user and the agent
+    behind them, and the school/site guards refuse impersonated tokens
+    outright (app/utils/school.py, app/utils/site.py).
+  - A support agent may never impersonate another support agent or a
+    site_admin — even though the two roles now share a permission level,
+    the boundary prevents one privileged account from acting under
+    another privileged account's identity without clear attribution.
 """
 
 from functools import wraps
