@@ -6,7 +6,8 @@
     "logout": "Logout",
     "admin_panel": "Admin Panel",
     "dashboard": "Dashboard",
-    "school_admin": "School Admin"
+    "school_admin": "School Admin",
+    "site_admin": "Site Admin"
   },
   "auth": {
     "login_title": "Sign In",
@@ -208,5 +209,32 @@
     "no_teachers": "No teachers in your institution yet.",
     "no_classes": "No classes yet — create the first one above.",
     "rename_class_confirm": "Apply this change to the class?"
+  },
+  "site": {
+    "title": "Site Administration",
+    "institutions": "Institutions",
+    "create_institution": "Create institution",
+    "inst_name": "Institution name",
+    "inst_type": "Type",
+    "plan_tier": "Plan tier",
+    "first_admin": "First administrator",
+    "admin_username": "Admin username",
+    "admin_password": "Admin password",
+    "admin_fullname": "Admin full name",
+    "students": "Students",
+    "teachers": "Teachers",
+    "classes": "Classes",
+    "no_institutions": "No institutions yet — create the first one above.",
+    "audit_log": "Audit log",
+    "filter_institution": "Institution",
+    "filter_action": "Action",
+    "filter_actor": "Actor ID",
+    "all_institutions": "All institutions",
+    "all_actions": "All actions",
+    "no_audit": "No audit entries match.",
+    "prev": "Previous",
+    "next": "Next",
+    "page_of": "Page {page} of {pages} ({total} entries)",
+    "created_admin_note": "Institution created. The first administrator can sign in with the credentials you set."
   }
 }

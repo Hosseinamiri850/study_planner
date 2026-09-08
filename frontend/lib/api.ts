@@ -14,22 +14,27 @@
 import { ApiError } from "./errors";
 import type {
   AssignClassInput,
+  AuditLogResponse,
   AuthResponse,
   Course,
   CourseListResponse,
   CreateClassInput,
   CreateCourseInput,
+  CreateInstitutionInput,
   CreateMajorInput,
   CreateTaskInput,
+  CreatedInstitutionResponse,
   DashboardStats,
   Major,
   MajorListResponse,
   MeUser,
+  PlanTier,
   RefreshResponse,
   SchoolClass,
   SchoolClassesResponse,
   SchoolOverview,
   SchoolUsersResponse,
+  SiteInstitutionsResponse,
   StudySession,
   StudySessionListResponse,
   Task,
@@ -201,6 +206,31 @@ export class ApiClient {
 
   assignSchoolUserClass(userId: number, input: AssignClassInput): Promise<UpdateSchoolUserResponse> {
     return this.put(`/api/proxy/school/users/${userId}`, input);
+  }
+
+  // --- site admin (global) ---
+
+  siteInstitutions(): Promise<SiteInstitutionsResponse> {
+    return this.request("/api/proxy/site/institutions");
+  }
+
+  createSiteInstitution(input: CreateInstitutionInput): Promise<CreatedInstitutionResponse> {
+    return this.post("/api/proxy/site/institutions", input);
+  }
+
+  updateInstitutionPlanTier(institutionId: number, plan_tier: PlanTier): Promise<{ institution: { id: number; name: string; type: string; plan_tier: string } }> {
+    return this.put(`/api/proxy/site/institutions/${institutionId}`, { plan_tier });
+  }
+
+  siteAuditLog(filters: { institution_id?: number; action?: string; actor_user_id?: number; page?: number; per_page?: number }): Promise<AuditLogResponse> {
+    const params = new URLSearchParams();
+    if (filters.institution_id != null) params.set("institution_id", String(filters.institution_id));
+    if (filters.action) params.set("action", filters.action);
+    if (filters.actor_user_id != null) params.set("actor_user_id", String(filters.actor_user_id));
+    if (filters.page != null) params.set("page", String(filters.page));
+    if (filters.per_page != null) params.set("per_page", String(filters.per_page));
+    const query = params.toString();
+    return this.request(`/api/proxy/site/audit-log${query ? `?${query}` : ""}`);
   }
 
   // --- translate ---
