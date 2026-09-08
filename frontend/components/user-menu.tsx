@@ -4,7 +4,7 @@
  * profile, admin (gated, UI-only — the API enforces), and logout. */
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Globe, LogOut, School, ShieldCheck, UserRound } from "lucide-react";
+import { Globe, Headset, LogOut, School, ShieldCheck, UserRound } from "lucide-react";
 
 import { useAuth } from "@/lib/auth-context";
 import { useLang } from "@/lib/lang-context";
@@ -86,6 +86,14 @@ export function UserMenu({ onLogout }: UserMenuProps) {
               <a href="/app/site-admin" className={itemClass}>
                 <Globe size={16} aria-hidden />
                 {t("nav.site_admin")}
+              </a>
+            </DropdownMenu.Item>
+          )}
+          {user.role === "support" && (
+            <DropdownMenu.Item asChild>
+              <a href="/app/support" className={itemClass}>
+                <Headset size={16} aria-hidden />
+                {t("nav.support")}
               </a>
             </DropdownMenu.Item>
           )}

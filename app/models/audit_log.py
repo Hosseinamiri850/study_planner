@@ -29,5 +29,10 @@ class AuditLog(db.Model):
     before = db.Column(db.JSON, nullable=True)
     after = db.Column(db.JSON, nullable=True)
     institution_id = db.Column(db.Integer, nullable=True)
+    # Support impersonation (TASK-040): set when the actor's token was
+    # minted by /api/support/impersonate — records the support agent
+    # behind the action. NULL for all direct (non-impersonated) writes.
+    impersonator_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     created_at = db.Column(db.DateTime, default=_utcnow, nullable=False, index=True)
-    actor = db.relationship("User")
+    actor = db.relationship("User", foreign_keys=[actor_user_id])
+    impersonator = db.relationship("User", foreign_keys=[impersonator_id])

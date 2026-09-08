@@ -40,6 +40,15 @@ def record(actor, action, target, before=None, after=None):
         return None
     try:
         target_type, target_id = target
+        # Support impersonation (TASK-040): when the actor's token carries
+        # an impersonator_id claim, the row records BOTH the user the
+        # action ran as (actor) and the support agent behind it.
+        try:
+            from flask import g
+
+            impersonator_id = getattr(g, "api_impersonator_id", None)
+        except RuntimeError:
+            impersonator_id = None
         row = AuditLog(
             actor_user_id=getattr(actor, "id", None),
             action=action,
@@ -48,6 +57,7 @@ def record(actor, action, target, before=None, after=None):
             before=before,
             after=after,
             institution_id=getattr(actor, "institution_id", None),
+            impersonator_id=impersonator_id,
         )
         db.session.add(row)
         db.session.commit()

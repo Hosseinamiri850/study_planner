@@ -7,7 +7,8 @@
     "admin_panel": "پنل مدیریت",
     "dashboard": "داشبورد",
     "school_admin": "پنل مدرسه",
-    "site_admin": "پنل سایت"
+    "site_admin": "پنل سایت",
+    "support": "پشتیبانی"
   },
   "auth": {
     "login_title": "ورود به حساب",
@@ -236,5 +237,25 @@
     "next": "بعدی",
     "page_of": "صفحه {page} از {pages} ({total} مورد)",
     "created_admin_note": "مؤسسه ساخته شد. اولین مدیر می‌تواند با اطلاعات ورودی که تعیین کردید وارد شود."
+  },
+  "support": {
+    "title": "کنسول پشتیبانی",
+    "institutions": "مؤسسات",
+    "users": "کاربران",
+    "search_users": "جستجوی کاربران (نام کاربری یا نام)",
+    "impersonate": "ورود به حساب",
+    "no_users": "کاربری یافت نشد.",
+    "audit_log": "گزارش حسابرسی",
+    "filter_institution": "مؤسسه",
+    "filter_action": "عملیات",
+    "filter_actor": "شناسه کاربر",
+    "all_institutions": "همه مؤسسات",
+    "no_audit": "موردی در گزارش نیست.",
+    "prev": "قبلی",
+    "next": "بعدی",
+    "page_of": "صفحه {page} از {pages} ({total} مورد)",
+    "banner_viewing": "در حال مشاهده به عنوان {username} — جلسه پشتیبانی، {minutes} دقیقه دیگر منقضی می‌شود",
+    "banner_exit": "خروج",
+    "read_only_note": "دسترسی پشتیبانی فقط خواندنی است؛ اقدامات هنگام ورود به حساب با شناسه شما ثبت می‌شود."
   }
 }

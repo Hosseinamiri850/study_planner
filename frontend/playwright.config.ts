@@ -11,7 +11,9 @@ import { defineConfig } from "@playwright/test";
  */
 
 const FLASK_PORT = 5001;
-const APP_PORT = 3100;
+// 3100 sits inside Windows' dynamic port-exclusion ranges (which move
+// between reboots), producing EACCES on next start — 3900 is outside them.
+const APP_PORT = 3900;
 // Absolute so Flask-SQLAlchemy passes it through unchanged (relative sqlite
 // URIs get app.instance_path prepended) and so the delete below matches the
 // file the server actually opens, regardless of process CWD.

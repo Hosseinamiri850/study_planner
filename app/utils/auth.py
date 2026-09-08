@@ -30,9 +30,19 @@ def _refresh_serializer():
     return URLSafeTimedSerializer(current_app.config["SECRET_KEY"], salt=REFRESH_SALT)
 
 
-def create_access_token(user):
-    """Create a short-lived stateless signed access token (15 min)."""
-    return _access_serializer().dumps({"user_id": user.id})
+def create_access_token(user, impersonator_id=None):
+    """Create a short-lived stateless signed access token (15 min).
+
+    impersonator_id is set ONLY on support-impersonation tokens (TASK-040):
+    the token still authenticates as `user`, but carries the support
+    agent's id so audit rows and privileged guards can see it. Lifetime is
+    identical to a normal access token by design — impersonation ends when
+    the token expires; there is no explicit "stop" call.
+    """
+    payload = {"user_id": user.id}
+    if impersonator_id is not None:
+        payload["impersonator_id"] = impersonator_id
+    return _access_serializer().dumps(payload)
 
 
 def issue_refresh_token(user):
@@ -99,6 +109,10 @@ def _authenticate_api():
     if not user:
         return None, ({"error": "User not found."}, 401)
     g.api_user = user
+    # Support-impersonation support (TASK-040): present ONLY on tokens
+    # minted by /api/support/impersonate. Privileged guards read this to
+    # refuse impersonated access; audit.record reads it to attribute rows.
+    g.api_impersonator_id = payload.get("impersonator_id")
     return user, None
 
 
@@ -113,12 +127,17 @@ def api_auth_required(view):
 
 
 def api_admin_required(view):
-    """Bearer auth + administrator role for write-guarded API endpoints."""
+    """Bearer auth + administrator role for write-guarded API endpoints.
+
+    Also refuses impersonated tokens (TASK-040): a support session acting
+    as any user must not reach admin mutations."""
     @wraps(view)
     def wrapped(*args, **kwargs):
         user, error = _authenticate_api()
         if error is not None:
             return error
+        if getattr(g, "api_impersonator_id", None) is not None:
+            return {"error": "Impersonation tokens cannot access administrative surfaces."}, 403
         if not user.is_admin:
             return {"error": "Administrator privileges required."}, 403
         return view(*args, **kwargs)

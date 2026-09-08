@@ -28,6 +28,8 @@ def seed_e2e():
     usernames = [
         "e2e_admin_a", "e2e_teacher_a", "e2e_stu_a1", "e2e_stu_a2",
         "e2e_admin_b", "e2e_teacher_b", "e2e_stu_b1",
+        # TASK-040: support flow fixtures
+        "e2e_support", "e2e_site_root",
     ]
     # Query.delete() bypasses ORM cascades, so classes must be swept
     # explicitly — both the fixture institutions' classes and any rows
@@ -51,7 +53,9 @@ def seed_e2e():
     stu_a1 = User(username="e2e_stu_a1", password=password_hash, fullname="Stu Alpha One", role="student", institution_id=alpha.id)
     stu_a2 = User(username="e2e_stu_a2", password=password_hash, fullname="Stu Alpha Two", role="student", institution_id=alpha.id)
     stu_b1 = User(username="e2e_stu_b1", password=password_hash, fullname="Stu Beta One", role="student", institution_id=beta.id)
-    db.session.add_all([admin_a, admin_b, teacher_a, teacher_b, stu_a1, stu_a2, stu_b1])
+    support = User(username="e2e_support", password=password_hash, fullname="Support Agent", role="support")
+    site_root = User(username="e2e_site_root", password=password_hash, fullname="Site Root", role="site_admin")
+    db.session.add_all([admin_a, admin_b, teacher_a, teacher_b, stu_a1, stu_a2, stu_b1, support, site_root])
     db.session.flush()
 
     class_a = Class(institution_id=alpha.id, name="Alpha Pre-seeded", grade_level="9")

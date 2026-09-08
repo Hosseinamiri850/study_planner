@@ -10,8 +10,11 @@ failure, so the response does not confirm resource existence.
 
 from functools import wraps
 
+from flask import g
+
 from app.models.user import ROLE_SCHOOL_ADMIN
 from app.utils.auth import _authenticate_api
+from app.utils.site import IMPERSONATION_FORBIDDEN
 
 
 def _load_school_admin():
@@ -34,11 +37,16 @@ def _reject_foreign(target_institution_id, actor_institution_id):
 
 
 def school_admin_required(view):
-    """Bearer auth + school_admin role + an institution to administer."""
+    """Bearer auth + school_admin role + an institution to administer.
+
+    Rejects impersonation tokens outright (TASK-040): a support session
+    acting AS a school_admin must not be able to wield school powers."""
     @wraps(view)
     def wrapped(*args, **kwargs):
         user, error = _load_school_admin()
         if error is not None:
             return error
+        if getattr(g, "api_impersonator_id", None) is not None:
+            return IMPERSONATION_FORBIDDEN
         return view(*args, **kwargs)
     return wrapped

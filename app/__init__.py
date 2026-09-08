@@ -33,6 +33,7 @@ def create_app(config_object=None):
     from app.routes.api import api_bp
     from app.routes.school import school_bp
     from app.routes.site import site_bp
+    from app.routes.support import support_bp
     from app.routes.web import web_bp
 
     app.register_blueprint(web_bp)
@@ -40,6 +41,7 @@ def create_app(config_object=None):
     app.register_blueprint(api_bp)
     app.register_blueprint(school_bp)
     app.register_blueprint(site_bp)
+    app.register_blueprint(support_bp)
     app.context_processor(inject_i18n)
 
     @app.after_request

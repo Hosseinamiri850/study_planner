@@ -16,6 +16,13 @@ export interface MeUser extends User {
   created_at: string;
 }
 
+/** Set on /api/me only when the current access token was minted by
+ * /api/support/impersonate — the id of the support agent behind it. */
+export interface MeResponse {
+  user: MeUser;
+  impersonator_id?: number | null;
+}
+
 export interface AuthResponse {
   user: User;
   access_token: string;
@@ -256,6 +263,9 @@ export interface AuditEntry {
   target_type: string;
   target_id: number | null;
   institution_id: number | null;
+  /** Support impersonation: id of the agent behind the action when the
+   * actor's token was minted via /api/support/impersonate. */
+  impersonator_id?: number | null;
   before: Record<string, unknown> | null;
   after: Record<string, unknown> | null;
 }
@@ -266,4 +276,29 @@ export interface AuditLogResponse {
   per_page: number;
   total: number;
   pages: number;
+}
+
+// --- support (global, read-only + impersonation) ---
+
+export interface SupportUser {
+  id: number;
+  username: string;
+  fullname: string;
+  role: string;
+  institution_id: number | null;
+  class_id: number | null;
+  created_at: string | null;
+}
+
+export interface SupportUsersResponse {
+  users: SupportUser[];
+  page: number;
+  per_page: number;
+  total: number;
+  pages: number;
+}
+
+export interface ImpersonateResponse {
+  access_token: string;
+  user: SupportUser;
 }
