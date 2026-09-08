@@ -6,7 +6,8 @@
     "logout": "خروج",
     "admin_panel": "پنل مدیریت",
     "dashboard": "داشبورد",
-    "school_admin": "پنل مدرسه"
+    "school_admin": "پنل مدرسه",
+    "site_admin": "پنل سایت"
   },
   "auth": {
     "login_title": "ورود به حساب",
@@ -208,5 +209,32 @@
     "no_teachers": "هنوز معلمی در مؤسسه شما نیست.",
     "no_classes": "هنوز کلاسی نیست — اولین کلاس را از بالا بسازید.",
     "rename_class_confirm": "این تغییر برای کلاس اعمال شود؟"
+  },
+  "site": {
+    "title": "مدیریت کل سایت",
+    "institutions": "مؤسسات",
+    "create_institution": "ایجاد مؤسسه",
+    "inst_name": "نام مؤسسه",
+    "inst_type": "نوع",
+    "plan_tier": "پلن اشتراک",
+    "first_admin": "اولین مدیر",
+    "admin_username": "نام کاربری مدیر",
+    "admin_password": "گذرواژه مدیر",
+    "admin_fullname": "نام کامل مدیر",
+    "students": "دانش‌آموزان",
+    "teachers": "معلمان",
+    "classes": "کلاس‌ها",
+    "no_institutions": "هنوز مؤسسه‌ای نیست — اولین را از بالا بسازید.",
+    "audit_log": "گزارش حسابرسی",
+    "filter_institution": "مؤسسه",
+    "filter_action": "عملیات",
+    "filter_actor": "شناسه کاربر",
+    "all_institutions": "همه مؤسسات",
+    "all_actions": "همه عملیات",
+    "no_audit": "موردی در گزارش نیست.",
+    "prev": "قبلی",
+    "next": "بعدی",
+    "page_of": "صفحه {page} از {pages} ({total} مورد)",
+    "created_admin_note": "مؤسسه ساخته شد. اولین مدیر می‌تواند با اطلاعات ورودی که تعیین کردید وارد شود."
   }
 }

@@ -30,6 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     { href: "/app", label: t("nav.dashboard") },
     ...(user?.is_admin ? [{ href: "/app/admin", label: t("nav.admin_panel") }] : []),
     ...(user?.role === "school_admin" ? [{ href: "/app/school-admin", label: t("nav.school_admin") }] : []),
+    ...(user?.role === "site_admin" ? [{ href: "/app/site-admin", label: t("nav.site_admin") }] : []),
     { href: "/app/profile", label: t("profile.title") },
   ];
 

@@ -212,3 +212,58 @@ export interface AssignClassInput {
 export interface UpdateSchoolUserResponse {
   user: SchoolUser;
 }
+
+// --- site admin (global) ---
+
+export interface InstitutionCounts {
+  students: number;
+  teachers: number;
+  classes: number;
+}
+
+export interface SiteInstitution extends InstitutionCounts {
+  id: number;
+  name: string;
+  type: string;
+  plan_tier: string;
+}
+
+export interface SiteInstitutionsResponse {
+  institutions: SiteInstitution[];
+}
+
+export type PlanTier = "free" | "pro" | "enterprise";
+
+export interface CreateInstitutionInput {
+  name: string;
+  type?: string;
+  plan_tier?: PlanTier;
+  admin_username: string;
+  admin_password: string;
+  admin_fullname?: string;
+}
+
+export interface CreatedInstitutionResponse {
+  institution: Omit<SiteInstitution, keyof InstitutionCounts>;
+  admin: { id: number; username: string; fullname: string; role: string };
+}
+
+export interface AuditEntry {
+  id: number;
+  created_at: string | null;
+  actor_user_id: number | null;
+  action: string;
+  target_type: string;
+  target_id: number | null;
+  institution_id: number | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}
+
+export interface AuditLogResponse {
+  entries: AuditEntry[];
+  page: number;
+  per_page: number;
+  total: number;
+  pages: number;
+}
